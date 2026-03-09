@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: rss-discord-api
+    command: npm run start:api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: /data/app.db
+    ports:
+      - "3000:3000"
+    volumes:
+      - rss_data:/data
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: rss-discord-worker
+    command: npm run start:worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: /data/app.db
+    volumes:
+      - rss_data:/data
+    restart: unless-stopped
+
+volumes:
+  rss_data:

@@ -1,0 +1,21 @@
+{
+  "name": "rss-discord-multiserver",
+  "version": "1.0.0",
+  "description": "Multi-server RSS to Discord monitor with dashboard, OAuth2, and worker polling",
+  "type": "module",
+  "main": "src/api/index.js",
+  "scripts": {
+    "start:api": "node src/api/index.js",
+    "start:worker": "node src/worker/index.js",
+    "test": "node test/run-tests.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "fast-xml-parser": "^4.5.1",
+    "morgan": "^1.10.0",
+    "p-limit": "^6.2.0"
+  }
+}

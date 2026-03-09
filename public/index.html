@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RSS Discord Dashboard</title>
+    <style>
+      :root {
+        --bg: #f7f9fc;
+        --card: #ffffff;
+        --text: #17212b;
+        --muted: #5b6b7a;
+        --accent: #0e7490;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at top, #e8f3ff, var(--bg));
+        color: var(--text);
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+      main {
+        max-width: 960px;
+        margin: 24px auto;
+        padding: 0 16px 24px;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(7, 20, 37, 0.08);
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      button {
+        background: var(--accent);
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        cursor: pointer;
+      }
+      textarea {
+        width: 100%;
+        min-height: 140px;
+        font-family: Consolas, monospace;
+      }
+      select {
+        padding: 8px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>RSS Discord Dashboard</h1>
+        <p class="muted">Configuration multi-serveur (vehicules + regles de statut).</p>
+        <div class="row">
+          <button id="login">Se connecter avec Discord</button>
+          <button id="logout">Se deconnecter</button>
+          <span id="authState" class="muted">Non connecte</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Serveur</h2>
+        <select id="guildSelect"></select>
+        <button id="loadGuild">Charger</button>
+      </div>
+
+      <div class="card">
+        <h2>Vehicules (JSON)</h2>
+        <p class="muted">Format: [{"vehicle_id":"2386","rss_url":"https://...","enabled":true}]</p>
+        <textarea id="vehiclesJson"></textarea>
+        <button id="saveVehicles">Sauvegarder vehicules</button>
+      </div>
+
+      <div class="card">
+        <h2>Status Rules (JSON)</h2>
+        <p class="muted">Format: [{"status":"Alerte","channel_id":"123","role_ids":["456"],"enabled":true}]</p>
+        <textarea id="rulesJson"></textarea>
+        <button id="saveRules">Sauvegarder regles</button>
+      </div>
+    </main>
+
+    <script>
+      const authState = document.getElementById("authState");
+      const guildSelect = document.getElementById("guildSelect");
+      const vehiclesJson = document.getElementById("vehiclesJson");
+      const rulesJson = document.getElementById("rulesJson");
+
+      async function api(path, options = {}) {
+        const response = await fetch(`/api${path}`, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+          }
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+        return response.json();
+      }
+
+      async function refreshAuth() {
+        try {
+          const me = await api("/auth/me");
+          authState.textContent = `Connecte: ${me.user.username}`;
+          await loadGuilds();
+        } catch {
+          authState.textContent = "Non connecte";
+        }
+      }
+
+      async function loadGuilds() {
+        const guilds = await api("/guilds");
+        guildSelect.innerHTML = guilds
+          .map((guild) => `<option value="${guild.id}">${guild.name}</option>`)
+          .join("");
+      }
+
+      async function loadGuildConfig() {
+        const guildId = guildSelect.value;
+        if (!guildId) return;
+        const vehicles = await api(`/guilds/${guildId}/vehicles`);
+        const rules = await api(`/guilds/${guildId}/status-rules`);
+        vehiclesJson.value = JSON.stringify(vehicles, null, 2);
+        rulesJson.value = JSON.stringify(rules, null, 2);
+      }
+
+      document.getElementById("login").onclick = () => {
+        window.location.href = "/api/auth/login";
+      };
+      document.getElementById("logout").onclick = async () => {
+        await api("/auth/logout", { method: "POST" });
+        window.location.reload();
+      };
+      document.getElementById("loadGuild").onclick = loadGuildConfig;
+      document.getElementById("saveVehicles").onclick = async () => {
+        const guildId = guildSelect.value;
+        await api(`/guilds/${guildId}/vehicles`, {
+          method: "PUT",
+          body: JSON.stringify(JSON.parse(vehiclesJson.value))
+        });
+        alert("Vehicules sauvegardes");
+      };
+      document.getElementById("saveRules").onclick = async () => {
+        const guildId = guildSelect.value;
+        await api(`/guilds/${guildId}/status-rules`, {
+          method: "PUT",
+          body: JSON.stringify(JSON.parse(rulesJson.value))
+        });
+        alert("Regles sauvegardees");
+      };
+
+      refreshAuth();
+    </script>
+  </body>
+</html>
