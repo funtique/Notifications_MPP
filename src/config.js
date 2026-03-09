@@ -20,7 +20,8 @@ export function getSharedConfig() {
     databaseUrl: process.env.DATABASE_URL ?? "./data/app.db",
     pollIntervalSeconds: Math.max(10, toInt(process.env.POLL_INTERVAL_SECONDS, 60)),
     fetchConcurrency: Math.max(1, toInt(process.env.FETCH_CONCURRENCY, 5)),
-    timezone: process.env.APP_TIMEZONE ?? "Europe/Paris"
+    timezone: process.env.APP_TIMEZONE ?? "Europe/Paris",
+    rssUrlTemplate: process.env.RSS_URL_TEMPLATE ?? "https://monpompier.com/flux/vehicules/{vehicle_id}.xml"
   };
 }
 

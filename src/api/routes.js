@@ -1,6 +1,7 @@
 import express from "express";
 import { requireAuth } from "./middleware.js";
 import { buildDiscordPayload, sendDiscordMessageWithRetry } from "../lib/discord.js";
+import { parseFeed } from "../lib/rss.js";
 
 function toBoolean(value, fallback = true) {
   if (typeof value === "boolean") return value;
@@ -14,9 +15,8 @@ function validateVehicleFeed(feed) {
     feed &&
     typeof feed === "object" &&
     typeof feed.vehicle_id === "string" &&
-    feed.vehicle_id.length > 0 &&
-    typeof feed.rss_url === "string" &&
-    feed.rss_url.length > 0
+    feed.vehicle_id.trim().length > 0 &&
+    (feed.rss_url === undefined || (typeof feed.rss_url === "string" && feed.rss_url.trim().length > 0))
   );
 }
 
@@ -29,6 +29,29 @@ function validateStatusRule(rule) {
     typeof rule.channel_id === "string" &&
     rule.channel_id.length > 0
   );
+}
+
+function resolveRssUrl(config, vehicleId, rssUrlInput) {
+  if (typeof rssUrlInput === "string" && rssUrlInput.trim().length > 0) {
+    return rssUrlInput.trim();
+  }
+  return config.rssUrlTemplate.replace("{vehicle_id}", encodeURIComponent(vehicleId));
+}
+
+async function fetchVehicleName(rssUrl) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(rssUrl, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const xml = await response.text();
+    const parsed = parseFeed(xml);
+    return parsed.channelTitle || null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function createApiRouter({ repos, authHandlers, config, logger }) {
@@ -75,19 +98,58 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
     res.json(data);
   });
 
-  router.put("/guilds/:guildId/vehicles", requireAuth, requireGuildAdmin, (req, res) => {
-    if (!Array.isArray(req.body) || req.body.some((feed) => !validateVehicleFeed(feed))) {
-      return res.status(400).json({ error: "Expected an array of { vehicle_id, rss_url, enabled }" });
+  router.post("/guilds/:guildId/vehicles/resolve", requireAuth, requireGuildAdmin, async (req, res) => {
+    const vehicleId = String(req.body?.vehicle_id ?? "").trim();
+    if (!vehicleId) {
+      return res.status(400).json({ error: "vehicle_id is required" });
     }
 
-    const sanitized = req.body.map((feed) => ({
-      vehicle_id: feed.vehicle_id.trim(),
-      rss_url: feed.rss_url.trim(),
-      enabled: toBoolean(feed.enabled, true)
-    }));
+    const rssUrl = resolveRssUrl(config, vehicleId, req.body?.rss_url);
+    let vehicleName = null;
+
+    try {
+      vehicleName = await fetchVehicleName(rssUrl);
+    } catch (error) {
+      logger.warn("Vehicle feed resolution failed", { vehicleId, rssUrl, error: String(error) });
+    }
+
+    return res.json({ vehicle_id: vehicleId, rss_url: rssUrl, vehicle_name: vehicleName });
+  });
+
+  router.put("/guilds/:guildId/vehicles", requireAuth, requireGuildAdmin, async (req, res) => {
+    if (!Array.isArray(req.body) || req.body.some((feed) => !validateVehicleFeed(feed))) {
+      return res.status(400).json({ error: "Expected array of { vehicle_id, rss_url?, vehicle_name?, enabled }" });
+    }
+
+    const sanitized = [];
+    for (const feed of req.body) {
+      const vehicleId = feed.vehicle_id.trim();
+      const rssUrl = resolveRssUrl(config, vehicleId, feed.rss_url);
+      let vehicleName = typeof feed.vehicle_name === "string" && feed.vehicle_name.trim().length > 0 ? feed.vehicle_name.trim() : null;
+
+      if (!vehicleName) {
+        try {
+          vehicleName = await fetchVehicleName(rssUrl);
+        } catch (error) {
+          logger.warn("Could not fetch vehicle name during save", {
+            guildId: req.params.guildId,
+            vehicleId,
+            rssUrl,
+            error: String(error)
+          });
+        }
+      }
+
+      sanitized.push({
+        vehicle_id: vehicleId,
+        vehicle_name: vehicleName,
+        rss_url: rssUrl,
+        enabled: toBoolean(feed.enabled, true)
+      });
+    }
 
     repos.replaceVehicleFeeds(req.params.guildId, sanitized);
-    return res.json({ ok: true, count: sanitized.length });
+    return res.json({ ok: true, count: sanitized.length, items: sanitized });
   });
 
   router.get("/guilds/:guildId/status-rules", requireAuth, requireGuildAdmin, (req, res) => {

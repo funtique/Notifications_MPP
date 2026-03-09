@@ -9,6 +9,10 @@ Application Node.js pour surveiller des flux RSS/XML de vehicules et envoyer des
 - Configuration multi-serveur:
   - plusieurs vehicules par serveur
   - regles par statut (`status -> channel_id + role_ids[]`)
+- Ajout simplifie de vehicule:
+  - `vehicle_id` seul possible
+  - URL RSS auto-genee via `RSS_URL_TEMPLATE`
+  - nom du vehicule auto-resolu depuis `channel > title`
 - Worker polling global (`POLL_INTERVAL_SECONDS`, concurrence limitee)
 - Deduplication robuste par hash d'evenement
 - SQLite avec retention de 50 evenements par vehicule
@@ -17,6 +21,7 @@ Application Node.js pour surveiller des flux RSS/XML de vehicules et envoyer des
 
 - `GET /api/guilds`
 - `GET /api/guilds/:guildId/vehicles`
+- `POST /api/guilds/:guildId/vehicles/resolve`
 - `PUT /api/guilds/:guildId/vehicles`
 - `GET /api/guilds/:guildId/status-rules`
 - `PUT /api/guilds/:guildId/status-rules`
@@ -34,6 +39,8 @@ Copier `.env.example` vers `.env`.
 - `DATABASE_URL` (default local ou `/data/app.db` en Docker)
 - `POLL_INTERVAL_SECONDS` (default `60`)
 - `FETCH_CONCURRENCY` (default `5`)
+- `APP_TIMEZONE` (default `Europe/Paris`)
+- `RSS_URL_TEMPLATE` (default `https://monpompier.com/flux/vehicules/{vehicle_id}.xml`)
 - `PORT` (default `3000`)
 
 ## Lancement local
@@ -46,13 +53,36 @@ npm run start:worker
 
 ## Docker / Portainer
 
-1. Creer `.env`.
-2. Deployer la stack `docker-compose.yml` dans Portainer.
+1. Creer `.env` ou renseigner les variables dans Portainer.
+2. Deployer la stack `docker-compose.yml`.
 3. Monter le volume `rss_data` (persistance SQLite).
 
 Services:
 - `api`: dashboard + endpoints
 - `worker`: polling RSS + envoi Discord
+
+## Exemples vehicules
+
+JSON minimal (URL + nom auto):
+
+```json
+[
+  { "vehicle_id": "2439", "enabled": true }
+]
+```
+
+JSON explicite:
+
+```json
+[
+  {
+    "vehicle_id": "2439",
+    "rss_url": "https://monpompier.com/flux/vehicules/2439.xml",
+    "vehicle_name": "VSAV 1 Eyguières",
+    "enabled": true
+  }
+]
+```
 
 ## Tests
 

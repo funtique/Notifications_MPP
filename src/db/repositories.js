@@ -22,8 +22,8 @@ export function createRepositories(db) {
 
   const deleteVehicleFeedsStmt = db.prepare("DELETE FROM vehicle_feeds WHERE guild_id = ?");
   const insertVehicleFeedStmt = db.prepare(`
-    INSERT INTO vehicle_feeds (guild_id, vehicle_id, rss_url, enabled, created_at, updated_at)
-    VALUES (@guild_id, @vehicle_id, @rss_url, @enabled, @created_at, @updated_at)
+    INSERT INTO vehicle_feeds (guild_id, vehicle_id, vehicle_name, rss_url, enabled, created_at, updated_at)
+    VALUES (@guild_id, @vehicle_id, @vehicle_name, @rss_url, @enabled, @created_at, @updated_at)
   `);
 
   const deleteStatusRulesStmt = db.prepare("DELETE FROM status_rules WHERE guild_id = ?");
@@ -33,14 +33,14 @@ export function createRepositories(db) {
   `);
 
   const listGuildVehicleFeedsStmt = db.prepare(`
-    SELECT id, guild_id, vehicle_id, rss_url, enabled, created_at, updated_at
+    SELECT id, guild_id, vehicle_id, vehicle_name, rss_url, enabled, created_at, updated_at
     FROM vehicle_feeds
     WHERE guild_id = ?
     ORDER BY vehicle_id ASC
   `);
 
   const listAllActiveVehicleFeedsStmt = db.prepare(`
-    SELECT vf.id, vf.guild_id, vf.vehicle_id, vf.rss_url, vf.enabled
+    SELECT vf.id, vf.guild_id, vf.vehicle_id, vf.vehicle_name, vf.rss_url, vf.enabled
     FROM vehicle_feeds vf
     JOIN guild_configs gc ON gc.guild_id = vf.guild_id
     WHERE vf.enabled = 1
@@ -109,6 +109,7 @@ export function createRepositories(db) {
       insertVehicleFeedStmt.run({
         guild_id: guildId,
         vehicle_id: String(feed.vehicle_id),
+        vehicle_name: feed.vehicle_name ? String(feed.vehicle_name) : null,
         rss_url: String(feed.rss_url),
         enabled: feed.enabled ? 1 : 0,
         created_at: now,

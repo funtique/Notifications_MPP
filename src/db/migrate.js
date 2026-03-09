@@ -11,6 +11,7 @@ export function migrate(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       guild_id TEXT NOT NULL,
       vehicle_id TEXT NOT NULL,
+      vehicle_name TEXT,
       rss_url TEXT NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
@@ -57,4 +58,10 @@ export function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_status_rules_lookup ON status_rules(guild_id, status, enabled);
     CREATE INDEX IF NOT EXISTS idx_events_vehicle_created ON events(vehicle_feed_id, created_at DESC, id DESC);
   `);
+
+  try {
+    db.exec("ALTER TABLE vehicle_feeds ADD COLUMN vehicle_name TEXT");
+  } catch {
+    // Column already exists on upgraded instances.
+  }
 }
