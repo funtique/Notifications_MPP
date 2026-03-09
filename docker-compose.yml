@@ -5,9 +5,16 @@ services:
     build: .
     container_name: rss-discord-api
     command: npm run start:api
-    env_file:
-      - .env
     environment:
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      APP_BASE_URL: ${APP_BASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+      FETCH_CONCURRENCY: ${FETCH_CONCURRENCY:-5}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+      PORT: ${PORT:-3000}
       DATABASE_URL: /data/app.db
     ports:
       - "3000:3000"
@@ -19,9 +26,11 @@ services:
     build: .
     container_name: rss-discord-worker
     command: npm run start:worker
-    env_file:
-      - .env
     environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+      FETCH_CONCURRENCY: ${FETCH_CONCURRENCY:-5}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
       DATABASE_URL: /data/app.db
     volumes:
       - rss_data:/data
