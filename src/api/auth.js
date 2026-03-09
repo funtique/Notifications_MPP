@@ -32,7 +32,7 @@ function hasAdminPermission(permissionString) {
 }
 
 export function createAuthHandlers(config) {
-  const redirectUri = `${config.appBaseUrl}/auth/callback`;
+  const redirectUri = `${config.appBaseUrl}/api/auth/callback`;
 
   function login(req, res) {
     const state = Math.random().toString(36).slice(2);
