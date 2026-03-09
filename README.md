@@ -9,10 +9,11 @@ Application Node.js pour surveiller des flux RSS/XML de vehicules et envoyer des
 - Configuration multi-serveur:
   - plusieurs vehicules par serveur
   - regles par statut (`status -> channel_id + role_ids[]`)
-- Ajout simplifie de vehicule:
-  - `vehicle_id` seul possible
-  - URL RSS auto-genee via `RSS_URL_TEMPLATE`
-  - nom du vehicule auto-resolu depuis `channel > title`
+- Ajout de flux simplifie:
+  - accepte directement un **ID** (`2439`)
+  - ou une **URL complete** (`https://monpompier.com/flux/vehicules/2439.xml`)
+  - URL auto-generee si ID seul
+  - nom du vehicule auto-resolu via `channel > title`
 - Worker polling global (`POLL_INTERVAL_SECONDS`, concurrence limitee)
 - Deduplication robuste par hash d'evenement
 - SQLite avec retention de 50 evenements par vehicule
@@ -63,24 +64,21 @@ Services:
 
 ## Exemples vehicules
 
-JSON minimal (URL + nom auto):
+Format ultra simple:
 
 ```json
 [
-  { "vehicle_id": "2439", "enabled": true }
+  "2439",
+  "https://monpompier.com/flux/vehicules/2386.xml"
 ]
 ```
 
-JSON explicite:
+Format objet (optionnel):
 
 ```json
 [
-  {
-    "vehicle_id": "2439",
-    "rss_url": "https://monpompier.com/flux/vehicules/2439.xml",
-    "vehicle_name": "VSAV 1 Eyguières",
-    "enabled": true
-  }
+  { "input": "2439" },
+  { "input": "https://monpompier.com/flux/vehicules/2386.xml", "enabled": true }
 ]
 ```
 
