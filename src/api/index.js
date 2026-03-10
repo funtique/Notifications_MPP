@@ -49,6 +49,24 @@ app.use(
 
 app.use("/api", createApiRouter({ repos, authHandlers, config, logger }));
 app.use(express.static(publicDir));
+app.use((error, req, res, _next) => {
+  logger.error("Unhandled API error", {
+    path: req.originalUrl,
+    method: req.method,
+    error: String(error?.stack ?? error)
+  });
+
+  if (res.headersSent) {
+    return;
+  }
+
+  if (req.originalUrl?.startsWith("/api/")) {
+    res.status(500).json({ error: "Internal server error" });
+    return;
+  }
+
+  res.status(500).send("Internal server error");
+});
 
 app.listen(config.port, () => {
   logger.info("API server started", {
