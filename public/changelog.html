@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Changelog | Webhook Discord</title>
+    <style>
+      :root {
+        --bg: #fff6f6;
+        --surface: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --line: #fecaca;
+        --primary: #dc2626;
+        --primary-dark: #991b1b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(900px 420px at 0% -15%, rgba(220, 38, 38, 0.18), transparent 60%),
+          linear-gradient(180deg, #fff8f8, #ffecec);
+      }
+      .container {
+        width: min(980px, 94vw);
+        margin: 0 auto;
+        padding: 28px 0 36px;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .btn {
+        display: inline-flex;
+        text-decoration: none;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .btn-primary {
+        color: #fff;
+        background: linear-gradient(145deg, var(--primary), var(--primary-dark));
+      }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 14px 30px rgba(127, 29, 29, 0.12);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(28px, 4vw, 38px);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .release {
+        margin-top: 12px;
+        border: 1px solid #fee2e2;
+        border-radius: 14px;
+        padding: 14px;
+        background: #fff;
+      }
+      .release h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .date {
+        margin-top: 4px;
+        color: #7f1d1d;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      ul {
+        margin: 10px 0 0;
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <div class="topbar">
+        <h1>Changelog</h1>
+        <a class="btn btn-primary" href="/">Retour au dashboard</a>
+      </div>
+
+      <section class="panel">
+        <p class="muted">Historique des evolutions du projet Webhook Discord.</p>
+
+        <article class="release">
+          <h2>v1.3.0 - UI Redesign + UX</h2>
+          <div class="date">10 mars 2026</div>
+          <ul>
+            <li>Landing page vitrine avant connexion avec bouton Discord OAuth.</li>
+            <li>Dashboard style Mee6 avec selection serveur visuelle.</li>
+            <li>Configuration vehicules en mode ID ou URL, avec recuperation automatique du nom.</li>
+            <li>Ajout de cette page changelog.</li>
+          </ul>
+        </article>
+
+        <article class="release">
+          <h2>v1.2.0 - Flux vehicules flexibles</h2>
+          <div class="date">9 mars 2026</div>
+          <ul>
+            <li>Support des entrees vehicules au format ID brut ou URL RSS complete.</li>
+            <li>Resolution automatique des informations vehicule via endpoint dedie.</li>
+          </ul>
+        </article>
+
+        <article class="release">
+          <h2>v1.1.0 - Dashboard multi-serveur</h2>
+          <div class="date">9 mars 2026</div>
+          <ul>
+            <li>Selection de serveur Discord admin et edition des regles de statut.</li>
+            <li>Sauvegarde des vehicules et regles par serveur.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

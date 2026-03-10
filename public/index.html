@@ -42,6 +42,16 @@
         font-weight: 700;
         cursor: pointer;
       }
+      a.btn-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 700;
+      }
 
       input,
       textarea {
@@ -337,6 +347,7 @@
             <div class="cta-row">
               <button id="landingLoginBtn" class="primary-btn">Se connecter avec Discord</button>
               <button id="landingDemoBtn" class="ghost-btn">Voir les fonctionnalites</button>
+              <a class="btn-link ghost-btn" href="/changelog.html">Voir le changelog</a>
             </div>
           </article>
 
@@ -387,6 +398,7 @@
             <div class="muted" id="welcomeText">Connecte</div>
           </div>
           <div class="cta-row" style="margin-top: 0">
+            <a class="btn-link ghost-btn" href="/changelog.html">Changelog</a>
             <button id="logoutBtn" class="ghost-btn">Se deconnecter</button>
           </div>
         </header>
@@ -411,7 +423,7 @@
                 <div class="section-head">
                   <div>
                     <h2>Vehicules RSS</h2>
-                    <p class="muted">ID, URL RSS, nom lisible, activation.</p>
+                    <p class="muted">Saisis un ID ou une URL RSS. Le nom est detecte automatiquement.</p>
                   </div>
                   <div class="cta-row" style="margin-top: 0">
                     <button id="addVehicleRow" class="ghost-btn tiny-btn">Ajouter</button>
@@ -422,8 +434,7 @@
                   <table>
                     <thead>
                       <tr>
-                        <th>Vehicle ID</th>
-                        <th>RSS URL</th>
+                        <th>ID ou URL RSS</th>
                         <th>Nom</th>
                         <th>Actif</th>
                         <th>Action</th>
@@ -513,6 +524,7 @@
 
       async function api(path, options = {}) {
         const response = await fetch(`/api${path}`, {
+          credentials: "include",
           ...options,
           headers: {
             "Content-Type": "application/json",
@@ -607,22 +619,65 @@
         });
       }
 
+      function normalizeVehicleEntry(entry = {}) {
+        if (typeof entry === "string") {
+          return {
+            input: entry,
+            vehicle_name: "",
+            enabled: true
+          };
+        }
+
+        const preferredInput = entry.input || entry.rss_url || entry.vehicle_id || "";
+        return {
+          input: preferredInput,
+          vehicle_name: entry.vehicle_name || "",
+          enabled: entry.enabled !== false
+        };
+      }
+
+      async function resolveVehicleRow(tr) {
+        const source = tr.querySelector('[data-field="input"]');
+        const nameInput = tr.querySelector('[data-field="vehicle_name"]');
+        const inputValue = source.value.trim();
+        if (!inputValue || !state.selectedGuildId) {
+          return;
+        }
+
+        try {
+          const resolved = await api(`/guilds/${state.selectedGuildId}/vehicles/resolve`, {
+            method: "POST",
+            body: JSON.stringify({ input: inputValue })
+          });
+          if (resolved?.vehicle_name) {
+            nameInput.value = resolved.vehicle_name;
+          }
+          syncVehiclesJsonFromTable();
+        } catch {
+          // Keep manual entry if resolve endpoint fails.
+        }
+      }
+
       function createVehicleRow(vehicle = {}) {
+        const normalized = normalizeVehicleEntry(vehicle);
         const tr = document.createElement("tr");
-        const vehicleId = escapeAttr(vehicle.vehicle_id || "");
-        const rssUrl = escapeAttr(vehicle.rss_url || "");
-        const vehicleName = escapeAttr(vehicle.vehicle_name || "");
+        const sourceValue = escapeAttr(normalized.input);
+        const vehicleName = escapeAttr(normalized.vehicle_name);
         tr.innerHTML = `
-          <td><input data-field="vehicle_id" value="${vehicleId}" placeholder="2439" /></td>
-          <td><input data-field="rss_url" value="${rssUrl}" placeholder="https://.../vehicules/2439.xml" /></td>
-          <td><input data-field="vehicle_name" value="${vehicleName}" placeholder="Nom vehicule" /></td>
-          <td><input data-field="enabled" type="checkbox" ${vehicle.enabled === false ? "" : "checked"} /></td>
+          <td><input data-field="input" value="${sourceValue}" placeholder="2439 ou https://.../vehicules/2439.xml" /></td>
+          <td><input data-field="vehicle_name" value="${vehicleName}" placeholder="Nom auto" /></td>
+          <td><input data-field="enabled" type="checkbox" ${normalized.enabled ? "checked" : ""} /></td>
           <td><button class="tiny-btn danger-btn">Supprimer</button></td>
         `;
 
         tr.querySelector("button").addEventListener("click", () => {
           tr.remove();
           syncVehiclesJsonFromTable();
+        });
+
+        const sourceInput = tr.querySelector('[data-field="input"]');
+        sourceInput.addEventListener("blur", () => {
+          resolveVehicleRow(tr);
         });
 
         tr.querySelectorAll("input").forEach((input) => {
@@ -661,11 +716,10 @@
 
       function readVehiclesFromTable() {
         return Array.from(ui.vehiclesRows.querySelectorAll("tr")).map((row) => ({
-          vehicle_id: row.querySelector('[data-field="vehicle_id"]').value.trim(),
-          rss_url: row.querySelector('[data-field="rss_url"]').value.trim(),
+          input: row.querySelector('[data-field="input"]').value.trim(),
           vehicle_name: row.querySelector('[data-field="vehicle_name"]').value.trim() || null,
           enabled: row.querySelector('[data-field="enabled"]').checked
-        }));
+        })).filter((entry) => entry.input.length > 0);
       }
 
       function readRulesFromTable() {
@@ -746,13 +800,18 @@
         if (!state.selectedGuildId) return;
         try {
           const rows = rowsFromJson(ui.vehiclesJson.value, "Vehicules");
-          await api(`/guilds/${state.selectedGuildId}/vehicles`, {
+          const result = await api(`/guilds/${state.selectedGuildId}/vehicles`, {
             method: "PUT",
             body: JSON.stringify(rows)
           });
-          renderVehiclesTable(rows);
+          renderVehiclesTable(Array.isArray(result?.items) ? result.items : rows);
           setStatus("Vehicules sauvegardes.", "ok");
         } catch (error) {
+          if (String(error.message || "").includes("Authentication required")) {
+            setStatus("Session expiree. Reconnecte-toi avec Discord.", "error");
+            showLanding();
+            return;
+          }
           setStatus(`Erreur vehicules: ${error.message}`, "error");
         }
       }
@@ -768,6 +827,11 @@
           renderRulesTable(rows);
           setStatus("Regles sauvegardees.", "ok");
         } catch (error) {
+          if (String(error.message || "").includes("Authentication required")) {
+            setStatus("Session expiree. Reconnecte-toi avec Discord.", "error");
+            showLanding();
+            return;
+          }
           setStatus(`Erreur regles: ${error.message}`, "error");
         }
       }

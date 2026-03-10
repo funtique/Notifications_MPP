@@ -20,6 +20,13 @@ const db = createDatabase(config.databaseUrl);
 migrate(db);
 const repos = createRepositories(db);
 const authHandlers = createAuthHandlers(config);
+const secureCookie = (() => {
+  try {
+    return new URL(config.appBaseUrl).protocol === "https:";
+  } catch {
+    return config.nodeEnv === "production";
+  }
+})();
 
 const app = express();
 
@@ -33,7 +40,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: config.nodeEnv === "production"
+      secure: secureCookie
     }
   })
 );

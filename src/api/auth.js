@@ -84,8 +84,14 @@ export function createAuthHandlers(config) {
       avatar: user.avatar
     };
     req.session.accessToken = tokenData.access_token;
+    delete req.session.oauthState;
 
-    return res.redirect("/");
+    return req.session.save((error) => {
+      if (error) {
+        return res.status(500).send("Unable to persist login session");
+      }
+      return res.redirect("/");
+    });
   }
 
   function logout(req, res) {
