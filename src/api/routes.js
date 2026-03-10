@@ -162,8 +162,45 @@ async function resolveVehicleConfigInput(config, rawEntry) {
   };
 }
 
+async function discordBotRequest(path, { botToken }) {
+  const response = await fetch(`https://discord.com/api/v10${path}`, {
+    headers: {
+      Authorization: `Bot ${botToken}`
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    const error = new Error(`Discord bot request failed (${response.status}): ${body}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.json();
+}
+
+function buildBotInviteUrl(config, guildId) {
+  const url = new URL("https://discord.com/oauth2/authorize");
+  url.searchParams.set("client_id", config.discordClientId);
+  url.searchParams.set("scope", "bot applications.commands");
+  url.searchParams.set("permissions", "8");
+  if (guildId) {
+    url.searchParams.set("guild_id", String(guildId));
+    url.searchParams.set("disable_guild_select", "true");
+  }
+  return url.toString();
+}
+
 export function createApiRouter({ repos, authHandlers, config, logger }) {
   const router = express.Router();
+  let botIdentityPromise = null;
+
+  function getBotIdentity() {
+    if (!botIdentityPromise) {
+      botIdentityPromise = discordBotRequest("/users/@me", { botToken: config.discordBotToken });
+    }
+    return botIdentityPromise;
+  }
 
   router.get("/health", (_req, res) => {
     res.json({ ok: true, timestamp: new Date().toISOString() });
@@ -312,6 +349,32 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
     });
 
     return res.json({ ok: true });
+  });
+
+  router.get("/guilds/:guildId/bot-status", requireAuth, requireGuildAdmin, async (req, res) => {
+    const guildId = String(req.params.guildId);
+    const inviteUrl = buildBotInviteUrl(config, guildId);
+
+    try {
+      const botIdentity = await getBotIdentity();
+      await discordBotRequest(`/guilds/${guildId}/members/${botIdentity.id}`, { botToken: config.discordBotToken });
+      return res.json({
+        present: true,
+        bot_user_id: botIdentity.id,
+        bot_username: botIdentity.username,
+        invite_url: inviteUrl
+      });
+    } catch (error) {
+      if (error?.status === 404) {
+        return res.json({
+          present: false,
+          invite_url: inviteUrl
+        });
+      }
+
+      logger.error("Bot status lookup failed", { guildId, error: String(error) });
+      return res.status(502).json({ error: "Unable to verify bot presence on this guild right now." });
+    }
   });
 
   return router;

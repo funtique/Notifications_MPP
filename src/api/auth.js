@@ -101,7 +101,7 @@ export function createAuthHandlers(config) {
   }
 
   async function me(req, res) {
-    if (!req.session.user) {
+    if (!req.session.user || !req.session.accessToken) {
       return res.status(401).json({ authenticated: false });
     }
 

@@ -312,6 +312,29 @@
         color: var(--danger);
       }
 
+      .bot-banner {
+        margin-top: 8px;
+        border-radius: 12px;
+        padding: 10px 12px;
+        border: 1px solid #fecaca;
+        background: #fff5f5;
+      }
+
+      .bot-banner.ok {
+        border-color: #99f6e4;
+        background: #f0fdfa;
+      }
+
+      .bot-banner.warn {
+        border-color: #fca5a5;
+        background: #fff1f2;
+      }
+
+      .inline-link {
+        color: #991b1b;
+        font-weight: 700;
+      }
+
       .empty {
         padding: 12px;
         border: 1px dashed #fca5a5;
@@ -417,6 +440,7 @@
               <div class="section">
                 <h2 id="selectedGuildName">Serveur</h2>
                 <p class="muted" id="selectedGuildMeta">Configuration active</p>
+                <div id="botStatusBanner" class="bot-banner">Verification de la presence du bot...</div>
               </div>
 
               <div class="section">
@@ -500,6 +524,7 @@
         guildConfigArea: document.getElementById("guildConfigArea"),
         selectedGuildName: document.getElementById("selectedGuildName"),
         selectedGuildMeta: document.getElementById("selectedGuildMeta"),
+        botStatusBanner: document.getElementById("botStatusBanner"),
         vehiclesRows: document.getElementById("vehiclesRows"),
         rulesRows: document.getElementById("rulesRows"),
         vehiclesJson: document.getElementById("vehiclesJson"),
@@ -534,6 +559,14 @@
 
         if (!response.ok) {
           const text = await response.text();
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed?.error) {
+              throw new Error(parsed.error);
+            }
+          } catch {
+            // ignore JSON parse errors
+          }
           throw new Error(text || `HTTP ${response.status}`);
         }
 
@@ -617,6 +650,41 @@
         state.guilds.forEach((guild) => {
           ui.guildList.appendChild(createGuildButton(guild));
         });
+      }
+
+      function renderBotStatus(status) {
+        const banner = ui.botStatusBanner;
+        if (!banner) return;
+
+        if (status?.present) {
+          banner.className = "bot-banner ok";
+          const botName = status.bot_username || "Le bot";
+          banner.textContent = `${botName} est deja present sur ce serveur.`;
+          return;
+        }
+
+        if (status?.invite_url) {
+          banner.className = "bot-banner warn";
+          banner.innerHTML = `Le bot n'est pas encore sur ce serveur. <a class="inline-link" href="${escapeAttr(status.invite_url)}" target="_blank" rel="noopener noreferrer">Inviter le bot</a>`;
+          return;
+        }
+
+        banner.className = "bot-banner warn";
+        banner.textContent = "Impossible de verifier la presence du bot pour le moment.";
+      }
+
+      async function loadBotStatus(guildId) {
+        const banner = ui.botStatusBanner;
+        if (!banner) return;
+        banner.className = "bot-banner";
+        banner.textContent = "Verification de la presence du bot...";
+        try {
+          const status = await api(`/guilds/${guildId}/bot-status`);
+          renderBotStatus(status);
+        } catch (error) {
+          banner.className = "bot-banner warn";
+          banner.textContent = `Verification bot indisponible: ${error.message}`;
+        }
       }
 
       function normalizeVehicleEntry(entry = {}) {
@@ -782,6 +850,7 @@
         ui.selectedGuildName.textContent = guild.name;
         ui.selectedGuildMeta.textContent = `ID serveur: ${guild.id}`;
         setStatus("Chargement de la configuration...", "muted");
+        loadBotStatus(guild.id);
 
         try {
           const [vehicles, rules] = await Promise.all([
@@ -809,7 +878,6 @@
         } catch (error) {
           if (String(error.message || "").includes("Authentication required")) {
             setStatus("Session expiree. Reconnecte-toi avec Discord.", "error");
-            showLanding();
             return;
           }
           setStatus(`Erreur vehicules: ${error.message}`, "error");
@@ -829,7 +897,6 @@
         } catch (error) {
           if (String(error.message || "").includes("Authentication required")) {
             setStatus("Session expiree. Reconnecte-toi avec Discord.", "error");
-            showLanding();
             return;
           }
           setStatus(`Erreur regles: ${error.message}`, "error");
