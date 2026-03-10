@@ -29,18 +29,20 @@ const secureCookie = (() => {
 })();
 
 const app = express();
+app.set("trust proxy", 1);
 
 app.use(morgan("combined"));
 app.use(express.json({ limit: "1mb" }));
 app.use(
   session({
     secret: config.sessionSecret,
+    proxy: true,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: secureCookie
+      secure: secureCookie ? "auto" : false
     }
   })
 );

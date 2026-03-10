@@ -562,7 +562,7 @@
           try {
             const parsed = JSON.parse(text);
             if (parsed?.error) {
-              throw new Error(parsed.error);
+              return Promise.reject(new Error(parsed.error));
             }
           } catch {
             // ignore JSON parse errors

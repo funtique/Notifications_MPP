@@ -47,7 +47,12 @@ export function createAuthHandlers(config) {
       prompt: "none"
     });
 
-    res.redirect(authUrl);
+    return req.session.save((error) => {
+      if (error) {
+        return res.status(500).send("Unable to start login session");
+      }
+      return res.redirect(authUrl);
+    });
   }
 
   async function callback(req, res) {
