@@ -21,14 +21,22 @@ function toBoolean(value, fallback = true) {
 }
 
 function validateStatusRule(rule) {
+  const vehicleId =
+    rule && typeof rule.vehicle_id === "string" && rule.vehicle_id.trim().length > 0 ? rule.vehicle_id.trim() : null;
+
   return (
     rule &&
     typeof rule === "object" &&
+    (vehicleId === null || /^[0-9A-Za-z_-]+$/.test(vehicleId)) &&
     typeof rule.status === "string" &&
     rule.status.length > 0 &&
     typeof rule.channel_id === "string" &&
     rule.channel_id.length > 0
   );
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isLikelyUrl(value) {
@@ -191,6 +199,12 @@ async function discordBotRequest(path, { botToken }) {
   return response.json();
 }
 
+function normalizeStatusRuleScope(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function buildBotInviteUrl(config, guildId) {
   const url = new URL("https://discord.com/oauth2/authorize");
   url.searchParams.set("client_id", config.discordClientId);
@@ -247,6 +261,23 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
     }
 
     return botIdentityInFlightPromise;
+  }
+
+  async function checkBotPresenceWithRetry({ guildId, botUserId, maxAttempts = 3, delayMs = 1200 }) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await discordBotRequest(`/guilds/${guildId}/members/${botUserId}`, { botToken: config.discordBotToken });
+        return true;
+      } catch (error) {
+        if (error?.status !== 404) {
+          throw error;
+        }
+        if (attempt < maxAttempts) {
+          await wait(delayMs);
+        }
+      }
+    }
+    return false;
   }
 
   router.get("/health", (_req, res) => {
@@ -377,19 +408,83 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
 
   router.put("/guilds/:guildId/status-rules", requireAuth, requireGuildAdmin, (req, res) => {
     if (!Array.isArray(req.body) || req.body.some((rule) => !validateStatusRule(rule))) {
-      return res.status(400).json({ error: "Expected an array of { status, channel_id, role_ids, enabled }" });
+      return res.status(400).json({ error: "Expected an array of { vehicle_id, status, channel_id, role_ids, enabled }" });
     }
 
     const sanitized = req.body.map((rule) => ({
+      vehicle_id: normalizeStatusRuleScope(rule.vehicle_id),
       status: rule.status.trim(),
       channel_id: rule.channel_id.trim(),
       role_ids: Array.isArray(rule.role_ids) ? rule.role_ids.map(String) : [],
       enabled: toBoolean(rule.enabled, true)
     }));
 
+    const seen = new Set();
+    for (const rule of sanitized) {
+      const key = `${rule.vehicle_id ?? "*"}::${rule.status.toLowerCase()}`;
+      if (seen.has(key)) {
+        return res.status(400).json({
+          error: `Duplicate status rule for vehicle ${rule.vehicle_id ?? "ALL"} and status "${rule.status}".`
+        });
+      }
+      seen.add(key);
+    }
+
     repos.replaceStatusRules(req.params.guildId, sanitized);
     return res.json({ ok: true, count: sanitized.length });
   });
+
+  router.get(
+    "/guilds/:guildId/discord-resources",
+    requireAuth,
+    requireGuildAdmin,
+    asyncHandler(async (req, res) => {
+      const guildId = String(req.params.guildId);
+
+      try {
+        const [channels, roles] = await Promise.all([
+          discordBotRequest(`/guilds/${guildId}/channels`, { botToken: config.discordBotToken }),
+          discordBotRequest(`/guilds/${guildId}/roles`, { botToken: config.discordBotToken })
+        ]);
+
+        const channelOptions = (Array.isArray(channels) ? channels : [])
+          .filter((channel) => channel && typeof channel.id === "string" && (channel.type === 0 || channel.type === 5))
+          .map((channel) => ({
+            id: channel.id,
+            name: channel.name ?? channel.id,
+            type: channel.type
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+
+        const roleOptions = (Array.isArray(roles) ? roles : [])
+          .filter((role) => role && typeof role.id === "string" && role.id !== guildId)
+          .map((role) => ({
+            id: role.id,
+            name: role.name ?? role.id,
+            position: Number(role.position ?? 0)
+          }))
+          .sort((a, b) => b.position - a.position || a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+
+        return res.json({
+          channels: channelOptions,
+          roles: roleOptions
+        });
+      } catch (error) {
+        const details = parseDiscordErrorBody(error);
+        logger.warn("Discord resources lookup failed", {
+          guildId,
+          path: error?.path,
+          status: error?.status ?? null,
+          discordCode: details.code,
+          discordMessage: details.message
+        });
+
+        return res.status(502).json({
+          error: "Impossible de recuperer salons/roles via le bot. Verifie sa presence et ses permissions sur ce serveur."
+        });
+      }
+    })
+  );
 
   router.post(
     "/guilds/:guildId/test-notification",
@@ -442,7 +537,14 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
 
       try {
         const botIdentity = await getBotIdentity();
-        await discordBotRequest(`/guilds/${guildId}/members/${botIdentity.id}`, { botToken: config.discordBotToken });
+        const isPresent = await checkBotPresenceWithRetry({ guildId, botUserId: botIdentity.id });
+        if (!isPresent) {
+          return res.json({
+            present: false,
+            invite_url: inviteUrl
+          });
+        }
+
         return res.json({
           present: true,
           bot_user_id: botIdentity.id,

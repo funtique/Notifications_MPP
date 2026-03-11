@@ -23,13 +23,14 @@ export function migrate(db) {
     CREATE TABLE IF NOT EXISTS status_rules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       guild_id TEXT NOT NULL,
+      vehicle_id TEXT,
       status TEXT NOT NULL,
       channel_id TEXT NOT NULL,
       role_ids_json TEXT NOT NULL DEFAULT '[]',
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      UNIQUE(guild_id, status),
+      UNIQUE(guild_id, status, vehicle_id),
       FOREIGN KEY(guild_id) REFERENCES guild_configs(guild_id) ON DELETE CASCADE
     );
 
@@ -55,7 +56,7 @@ export function migrate(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_vehicle_feeds_active ON vehicle_feeds(enabled, guild_id);
-    CREATE INDEX IF NOT EXISTS idx_status_rules_lookup ON status_rules(guild_id, status, enabled);
+    CREATE INDEX IF NOT EXISTS idx_status_rules_lookup ON status_rules(guild_id, status, vehicle_id, enabled);
     CREATE INDEX IF NOT EXISTS idx_events_vehicle_created ON events(vehicle_feed_id, created_at DESC, id DESC);
   `);
 
@@ -63,5 +64,35 @@ export function migrate(db) {
     db.exec("ALTER TABLE vehicle_feeds ADD COLUMN vehicle_name TEXT");
   } catch {
     // Column already exists on upgraded instances.
+  }
+
+  const statusRulesCols = db.prepare("PRAGMA table_info(status_rules)").all();
+  const hasVehicleIdOnStatusRules = statusRulesCols.some((col) => col.name === "vehicle_id");
+
+  if (!hasVehicleIdOnStatusRules) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS status_rules_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id TEXT NOT NULL,
+        vehicle_id TEXT,
+        status TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        role_ids_json TEXT NOT NULL DEFAULT '[]',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(guild_id, status, vehicle_id),
+        FOREIGN KEY(guild_id) REFERENCES guild_configs(guild_id) ON DELETE CASCADE
+      );
+
+      INSERT INTO status_rules_v2 (id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at)
+      SELECT id, guild_id, NULL, status, channel_id, role_ids_json, enabled, created_at, updated_at
+      FROM status_rules;
+
+      DROP TABLE status_rules;
+      ALTER TABLE status_rules_v2 RENAME TO status_rules;
+
+      CREATE INDEX IF NOT EXISTS idx_status_rules_lookup ON status_rules(guild_id, status, vehicle_id, enabled);
+    `);
   }
 }

@@ -18,7 +18,7 @@ export async function handleParsedFeed({ repos, feedConfig, parsedFeed, botToken
       continue;
     }
 
-    const rule = repos.getStatusRule(feedConfig.guild_id, event.status);
+    const rule = repos.getStatusRule(feedConfig.guild_id, event.status, feedConfig.vehicle_id);
     if (!rule || !rule.enabled) {
       logger.debug("Status ignored because no active rule", {
         guildId: feedConfig.guild_id,

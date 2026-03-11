@@ -28,8 +28,8 @@ export function createRepositories(db) {
 
   const deleteStatusRulesStmt = db.prepare("DELETE FROM status_rules WHERE guild_id = ?");
   const insertStatusRuleStmt = db.prepare(`
-    INSERT INTO status_rules (guild_id, status, channel_id, role_ids_json, enabled, created_at, updated_at)
-    VALUES (@guild_id, @status, @channel_id, @role_ids_json, @enabled, @created_at, @updated_at)
+    INSERT INTO status_rules (guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at)
+    VALUES (@guild_id, @vehicle_id, @status, @channel_id, @role_ids_json, @enabled, @created_at, @updated_at)
   `);
 
   const listGuildVehicleFeedsStmt = db.prepare(`
@@ -48,16 +48,24 @@ export function createRepositories(db) {
   `);
 
   const listStatusRulesStmt = db.prepare(`
-    SELECT id, guild_id, status, channel_id, role_ids_json, enabled, created_at, updated_at
+    SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at
     FROM status_rules
     WHERE guild_id = ?
-    ORDER BY status ASC
+    ORDER BY status ASC, vehicle_id ASC
   `);
 
-  const getStatusRuleStmt = db.prepare(`
-    SELECT id, guild_id, status, channel_id, role_ids_json, enabled
+  const getStatusRuleByVehicleStmt = db.prepare(`
+    SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled
     FROM status_rules
-    WHERE guild_id = ? AND status = ? AND enabled = 1
+    WHERE guild_id = ? AND vehicle_id = ? AND status = ? AND enabled = 1
+    LIMIT 1
+  `);
+
+  const getGlobalStatusRuleStmt = db.prepare(`
+    SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled
+    FROM status_rules
+    WHERE guild_id = ? AND status = ? AND enabled = 1 AND (vehicle_id IS NULL OR vehicle_id = '')
+    LIMIT 1
   `);
 
   const hasEventStmt = db.prepare(`
@@ -124,6 +132,7 @@ export function createRepositories(db) {
     for (const rule of rules) {
       insertStatusRuleStmt.run({
         guild_id: guildId,
+        vehicle_id: rule.vehicle_id ? String(rule.vehicle_id) : null,
         status: String(rule.status),
         channel_id: String(rule.channel_id),
         role_ids_json: JSON.stringify(Array.isArray(rule.role_ids) ? rule.role_ids.map(String) : []),
@@ -183,16 +192,25 @@ export function createRepositories(db) {
     listStatusRules(guildId) {
       return listStatusRulesStmt.all(String(guildId)).map((row) => ({
         ...row,
+        vehicle_id: row.vehicle_id ? String(row.vehicle_id) : null,
         enabled: Boolean(row.enabled),
         role_ids: parseRoleIds(row.role_ids_json)
       }));
     },
 
-    getStatusRule(guildId, status) {
-      const row = getStatusRuleStmt.get(String(guildId), String(status));
+    getStatusRule(guildId, status, vehicleId = null) {
+      const targetGuildId = String(guildId);
+      const targetStatus = String(status);
+      const scopedVehicleId = vehicleId ? String(vehicleId) : null;
+
+      const row =
+        (scopedVehicleId ? getStatusRuleByVehicleStmt.get(targetGuildId, scopedVehicleId, targetStatus) : null) ??
+        getGlobalStatusRuleStmt.get(targetGuildId, targetStatus);
+
       if (!row) return null;
       return {
         ...row,
+        vehicle_id: row.vehicle_id ? String(row.vehicle_id) : null,
         enabled: Boolean(row.enabled),
         role_ids: parseRoleIds(row.role_ids_json)
       };

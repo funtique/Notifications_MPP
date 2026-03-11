@@ -10,15 +10,23 @@ export async function runProcessorTests() {
   const repos = createRepositories(db);
 
   repos.upsertGuildConfig("g1", "Guild 1");
-  repos.replaceVehicleFeeds("g1", [{ vehicle_id: "2386", rss_url: "https://example.com/rss", enabled: true }]);
+  repos.replaceVehicleFeeds("g1", [
+    { vehicle_id: "2386", rss_url: "https://example.com/rss-2386", enabled: true },
+    { vehicle_id: "2569", rss_url: "https://example.com/rss-2569", enabled: true }
+  ]);
   repos.replaceStatusRules("g1", [
-    { status: "Alerté", channel_id: "ch1", role_ids: ["role1", "role2"], enabled: true }
+    { status: "Alerté", channel_id: "ch1", role_ids: ["role1", "role2"], enabled: true },
+    { vehicle_id: "2569", status: "Désinfection", channel_id: "ch2", role_ids: ["role3"], enabled: true }
   ]);
 
-  const feedConfig = repos.listVehicleFeeds("g1")[0];
+  const allFeeds = repos.listVehicleFeeds("g1");
+  const feedConfig = allFeeds.find((feed) => feed.vehicle_id === "2386");
+  const feedConfig2569 = allFeeds.find((feed) => feed.vehicle_id === "2569");
+  assert.ok(feedConfig);
+  assert.ok(feedConfig2569);
 
   const parsed = {
-    telemetryByVehicleId: new Map([["2386", { fuel: "80", wear: "2 %" }]]),
+      telemetryByVehicleId: new Map([["2386", { fuel: "80", wear: "2 %" }]]),
     statusEvents: [
       {
         title: "Changement d'état",
@@ -55,6 +63,44 @@ export async function runProcessorTests() {
   });
 
   assert.equal(callCount, 1);
+
+  const parsedDisinfection = {
+    telemetryByVehicleId: new Map([
+      ["2386", { fuel: "75", wear: "3 %" }],
+      ["2569", { fuel: "55", wear: "9 %" }]
+    ]),
+    statusEvents: [
+      {
+        title: "Maintenance",
+        description: "desinfection",
+        status: "Désinfection",
+        pubDateRaw: "09/03/2026 10:00:00 GMT+1",
+        pubDateIso: "2026-03-09T09:00:00.000Z"
+      }
+    ]
+  };
+
+  // 2386 should not send for Désinfection because the rule is scoped to 2569.
+  await handleParsedFeed({
+    repos,
+    feedConfig,
+    parsedFeed: parsedDisinfection,
+    botToken: "token",
+    logger: { debug() {}, info() {}, warn() {}, error() {} },
+    fetchImpl
+  });
+
+  // 2569 should send for Désinfection because the rule matches this vehicle.
+  await handleParsedFeed({
+    repos,
+    feedConfig: feedConfig2569,
+    parsedFeed: parsedDisinfection,
+    botToken: "token",
+    logger: { debug() {}, info() {}, warn() {}, error() {} },
+    fetchImpl
+  });
+
+  assert.equal(callCount, 2);
 
   for (let i = 0; i < 60; i += 1) {
     repos.insertEventAndCheckpoint({

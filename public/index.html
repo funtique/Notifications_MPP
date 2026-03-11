@@ -18,6 +18,19 @@
         --danger: #b91c1c;
         --shadow: 0 18px 35px rgba(127, 29, 29, 0.13);
       }
+      body[data-theme="dark"] {
+        --bg: #111827;
+        --surface: #1f2937;
+        --surface-strong: #111827;
+        --text: #f9fafb;
+        --muted: #cbd5e1;
+        --line: #374151;
+        --primary: #ef4444;
+        --primary-dark: #991b1b;
+        --ok: #14b8a6;
+        --danger: #f87171;
+        --shadow: 0 22px 40px rgba(0, 0, 0, 0.35);
+      }
 
       * {
         box-sizing: border-box;
@@ -32,6 +45,13 @@
           radial-gradient(1200px 520px at -15% -15%, rgba(220, 38, 38, 0.16), transparent 60%),
           radial-gradient(900px 500px at 110% 0%, rgba(185, 28, 28, 0.16), transparent 55%),
           linear-gradient(180deg, #fff8f8, #fff2f2 56%, #ffe8e8 100%);
+        transition: background 0.35s ease, color 0.35s ease;
+      }
+      body[data-theme="dark"] {
+        background:
+          radial-gradient(1200px 540px at -15% -20%, rgba(239, 68, 68, 0.2), transparent 60%),
+          radial-gradient(900px 520px at 110% 0%, rgba(153, 27, 27, 0.18), transparent 58%),
+          linear-gradient(180deg, #0f172a, #111827 62%, #1f2937 100%);
       }
 
       button {
@@ -54,14 +74,16 @@
       }
 
       input,
-      textarea {
+      textarea,
+      select {
         width: 100%;
         border: 1px solid var(--line);
         border-radius: 10px;
         padding: 9px 10px;
         font-family: Arial, Helvetica, sans-serif;
         font-size: 14px;
-        background: #fff;
+        background: var(--surface);
+        color: var(--text);
       }
 
       textarea {
@@ -148,6 +170,9 @@
         padding: 22px;
         background: linear-gradient(150deg, #fff, #fff5f5 56%, #ffe4e6);
       }
+      body[data-theme="dark"] .hero-card {
+        background: linear-gradient(155deg, #1f2937, #111827 58%, #0f172a);
+      }
 
       .mini-grid {
         margin-top: 8px;
@@ -177,6 +202,25 @@
       .feature h3 {
         margin: 0 0 8px;
         font-size: 17px;
+      }
+      .hero-kpis {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .kpi {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--surface);
+      }
+      .kpi strong {
+        font-size: 20px;
+        color: var(--primary-dark);
+      }
+      body[data-theme="dark"] .kpi strong {
+        color: #fecaca;
       }
 
       .dashboard {
@@ -248,7 +292,7 @@
       .section {
         border: 1px solid #fecaca;
         border-radius: 14px;
-        background: #fff;
+        background: var(--surface);
         padding: 14px;
         margin-bottom: 12px;
       }
@@ -329,10 +373,21 @@
         border-color: #fca5a5;
         background: #fff1f2;
       }
+      body[data-theme="dark"] .bot-banner.ok {
+        background: rgba(20, 184, 166, 0.18);
+        border-color: rgba(20, 184, 166, 0.55);
+      }
+      body[data-theme="dark"] .bot-banner.warn {
+        background: rgba(239, 68, 68, 0.18);
+        border-color: rgba(239, 68, 68, 0.5);
+      }
 
       .inline-link {
         color: #991b1b;
         font-weight: 700;
+      }
+      body[data-theme="dark"] .inline-link {
+        color: #fecaca;
       }
 
       .empty {
@@ -341,11 +396,50 @@
         border-radius: 12px;
         background: #fff6f6;
       }
+      .field-hint {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .theme-toggle {
+        min-width: 140px;
+      }
+      .resolving {
+        opacity: 0.75;
+      }
+      .resolving input[data-field="vehicle_name"] {
+        background: var(--surface-strong);
+      }
+      @keyframes floatIn {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .panel {
+        animation: floatIn 0.4s ease both;
+      }
+      .rule-select-wrap {
+        display: grid;
+        gap: 6px;
+        min-width: 180px;
+      }
+      select[multiple] {
+        min-height: 96px;
+      }
 
       @media (max-width: 980px) {
         .hero,
         .layout,
         .features {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-kpis {
           grid-template-columns: 1fr;
         }
 
@@ -370,7 +464,22 @@
             <div class="cta-row">
               <button id="landingLoginBtn" class="primary-btn">Se connecter avec Discord</button>
               <button id="landingDemoBtn" class="ghost-btn">Voir les fonctionnalites</button>
+              <button id="themeToggleBtnLanding" class="ghost-btn theme-toggle">Dark mode</button>
               <a class="btn-link ghost-btn" href="/changelog.html">Voir le changelog</a>
+            </div>
+            <div class="hero-kpis">
+              <div class="kpi">
+                <strong>1 clic</strong>
+                <div class="muted">pour choisir un serveur admin</div>
+              </div>
+              <div class="kpi">
+                <strong>par vehicule</strong>
+                <div class="muted">regles de notif fines selon le statut</div>
+              </div>
+              <div class="kpi">
+                <strong>zero guesswork</strong>
+                <div class="muted">salons + roles en liste deroulante</div>
+              </div>
             </div>
           </article>
 
@@ -411,6 +520,10 @@
             <h3>Configuration avancable</h3>
             <p class="muted">Edition par formulaire et JSON pour les cas experts.</p>
           </article>
+          <article class="panel feature">
+            <h3>Routage intelligent</h3>
+            <p class="muted">Associe un statut global ou cible un vehicule precis pour chaque alerte.</p>
+          </article>
         </div>
       </section>
 
@@ -421,6 +534,7 @@
             <div class="muted" id="welcomeText">Connecte</div>
           </div>
           <div class="cta-row" style="margin-top: 0">
+            <button id="themeToggleBtnDashboard" class="ghost-btn theme-toggle">Dark mode</button>
             <a class="btn-link ghost-btn" href="/changelog.html">Changelog</a>
             <button id="logoutBtn" class="ghost-btn">Se deconnecter</button>
           </div>
@@ -477,20 +591,24 @@
                 <div class="section-head">
                   <div>
                     <h2>Regles de statut</h2>
-                    <p class="muted">Associe un statut RSS a un channel Discord et des roles.</p>
+                    <p class="muted">Associe un statut RSS a un channel Discord et des roles, globalement ou par vehicule.</p>
                   </div>
                   <div class="cta-row" style="margin-top: 0">
                     <button id="addRuleRow" class="ghost-btn tiny-btn">Ajouter</button>
                     <button id="saveRulesBtn" class="primary-btn tiny-btn">Sauvegarder</button>
                   </div>
                 </div>
+                <div class="field-hint">
+                  Les listes salons/roles apparaissent quand le bot est present sur le serveur. Sinon, saisie manuelle par ID.
+                </div>
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
+                        <th>Vehicule</th>
                         <th>Status</th>
-                        <th>Channel ID</th>
-                        <th>Role IDs (comma)</th>
+                        <th>Channel</th>
+                        <th>Roles</th>
                         <th>Actif</th>
                         <th>Action</th>
                       </tr>
@@ -517,6 +635,8 @@
         dashboard: document.getElementById("dashboard"),
         landingLoginBtn: document.getElementById("landingLoginBtn"),
         landingDemoBtn: document.getElementById("landingDemoBtn"),
+        themeToggleBtnLanding: document.getElementById("themeToggleBtnLanding"),
+        themeToggleBtnDashboard: document.getElementById("themeToggleBtnDashboard"),
         logoutBtn: document.getElementById("logoutBtn"),
         welcomeText: document.getElementById("welcomeText"),
         guildList: document.getElementById("guildList"),
@@ -539,7 +659,11 @@
       const state = {
         user: null,
         guilds: [],
-        selectedGuildId: null
+        selectedGuildId: null,
+        discordResources: {
+          channels: [],
+          roles: []
+        }
       };
 
       function setStatus(message, type = "muted") {
@@ -575,6 +699,24 @@
           return response.json();
         }
         return null;
+      }
+
+      function setTheme(theme) {
+        const nextTheme = theme === "dark" ? "dark" : "light";
+        document.body.setAttribute("data-theme", nextTheme);
+        localStorage.setItem("dashboard_theme", nextTheme);
+        const label = nextTheme === "dark" ? "Mode clair" : "Dark mode";
+        if (ui.themeToggleBtnLanding) ui.themeToggleBtnLanding.textContent = label;
+        if (ui.themeToggleBtnDashboard) ui.themeToggleBtnDashboard.textContent = label;
+      }
+
+      function toggleTheme() {
+        const current = document.body.getAttribute("data-theme") || "light";
+        setTheme(current === "dark" ? "light" : "dark");
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
       }
 
       function showLanding() {
@@ -686,13 +828,29 @@
         if (!banner) return;
         banner.className = "bot-banner";
         banner.textContent = "Verification de la presence du bot...";
-        try {
-          const status = await api(`/guilds/${guildId}/bot-status`);
-          renderBotStatus(status);
-        } catch (error) {
-          banner.className = "bot-banner warn";
-          banner.textContent = `Verification bot indisponible: ${error.message}`;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try {
+            const status = await api(`/guilds/${guildId}/bot-status`);
+            if (!status?.present && attempt < 3) {
+              banner.textContent = `Verification du bot (tentative ${attempt + 1}/3)...`;
+              await sleep(1200);
+              continue;
+            }
+
+            renderBotStatus(status);
+            return;
+          } catch (error) {
+            lastError = error;
+            if (attempt < 3) {
+              await sleep(800);
+            }
+          }
         }
+
+        banner.className = "bot-banner warn";
+        banner.textContent = `Verification bot indisponible: ${lastError?.message ?? "erreur inconnue"}`;
       }
 
       function normalizeVehicleEntry(entry = {}) {
@@ -720,6 +878,11 @@
           return;
         }
 
+        tr.classList.add("resolving");
+        nameInput.disabled = true;
+        const previousPlaceholder = nameInput.placeholder;
+        nameInput.placeholder = "Resolution du nom en cours...";
+
         try {
           const resolved = await api(`/guilds/${state.selectedGuildId}/vehicles/resolve`, {
             method: "POST",
@@ -731,6 +894,10 @@
           syncVehiclesJsonFromTable();
         } catch {
           // Keep manual entry if resolve endpoint fails.
+        } finally {
+          nameInput.disabled = false;
+          nameInput.placeholder = previousPlaceholder;
+          tr.classList.remove("resolving");
         }
       }
 
@@ -749,6 +916,7 @@
         tr.querySelector("button").addEventListener("click", () => {
           tr.remove();
           syncVehiclesJsonFromTable();
+          refreshRuleVehicleScopeOptions();
         });
 
         const sourceInput = tr.querySelector('[data-field="input"]');
@@ -757,32 +925,188 @@
         });
 
         tr.querySelectorAll("input").forEach((input) => {
-          input.addEventListener("input", syncVehiclesJsonFromTable);
-          input.addEventListener("change", syncVehiclesJsonFromTable);
+          input.addEventListener("input", () => {
+            syncVehiclesJsonFromTable();
+            refreshRuleVehicleScopeOptions();
+          });
+          input.addEventListener("change", () => {
+            syncVehiclesJsonFromTable();
+            refreshRuleVehicleScopeOptions();
+          });
         });
 
         return tr;
       }
 
+      function extractVehicleId(inputValue) {
+        const raw = String(inputValue || "").trim();
+        if (!raw) return null;
+        if (/^\d+$/.test(raw)) return raw;
+        const match = raw.match(/\/vehicules\/(\d+)\.xml(?:$|[?#])/i) || raw.match(/\/vehicules\/(\d+)\.xml$/i);
+        return match ? match[1] : null;
+      }
+
+      function getVehicleOptionsFromTable() {
+        const items = readVehiclesFromTable();
+        const byId = new Map();
+
+        for (const item of items) {
+          const id = extractVehicleId(item.input);
+          if (!id) continue;
+          if (byId.has(id)) continue;
+          const label = item.vehicle_name ? `${id} - ${item.vehicle_name}` : id;
+          byId.set(id, label);
+        }
+
+        return Array.from(byId.entries()).map(([id, label]) => ({ id, label }));
+      }
+
+      function populateVehicleScopeSelect(select, selectedValue = "") {
+        const current = String(selectedValue || "");
+        const options = getVehicleOptionsFromTable();
+        const values = new Set(options.map((option) => option.id));
+        const finalValue = current && !values.has(current) ? current : current;
+
+        select.innerHTML = "";
+        const allOption = document.createElement("option");
+        allOption.value = "";
+        allOption.textContent = "Tous les vehicules";
+        select.appendChild(allOption);
+
+        for (const option of options) {
+          const opt = document.createElement("option");
+          opt.value = option.id;
+          opt.textContent = option.label;
+          select.appendChild(opt);
+        }
+
+        if (finalValue && !values.has(finalValue)) {
+          const custom = document.createElement("option");
+          custom.value = finalValue;
+          custom.textContent = `${finalValue} (hors liste)`;
+          select.appendChild(custom);
+        }
+
+        select.value = finalValue;
+      }
+
+      function populateChannelSelect(select, selectedValue = "") {
+        const current = String(selectedValue || "");
+        select.innerHTML = "";
+
+        const first = document.createElement("option");
+        first.value = "";
+        first.textContent = state.discordResources.channels.length > 0 ? "Choisir un channel..." : "Channels indisponibles";
+        select.appendChild(first);
+
+        for (const channel of state.discordResources.channels) {
+          const opt = document.createElement("option");
+          opt.value = channel.id;
+          opt.textContent = `#${channel.name}`;
+          select.appendChild(opt);
+        }
+
+        if (current && !state.discordResources.channels.some((entry) => entry.id === current)) {
+          const custom = document.createElement("option");
+          custom.value = current;
+          custom.textContent = `${current} (manuel)`;
+          select.appendChild(custom);
+        }
+
+        select.value = current;
+      }
+
+      function populateRoleSelect(select, selectedRoleIds = []) {
+        const selectedSet = new Set((Array.isArray(selectedRoleIds) ? selectedRoleIds : []).map(String));
+        select.innerHTML = "";
+
+        for (const role of state.discordResources.roles) {
+          const opt = document.createElement("option");
+          opt.value = role.id;
+          opt.textContent = `@${role.name}`;
+          if (selectedSet.has(role.id)) {
+            opt.selected = true;
+          }
+          select.appendChild(opt);
+        }
+      }
+
+      function refreshRuleVehicleScopeOptions() {
+        ui.rulesRows.querySelectorAll('select[data-field="vehicle_scope"]').forEach((select) => {
+          populateVehicleScopeSelect(select, select.value || "");
+        });
+      }
+
       function createRuleRow(rule = {}) {
         const status = escapeAttr(rule.status || "");
         const channelId = escapeAttr(rule.channel_id || "");
-        const roleValue = escapeAttr(Array.isArray(rule.role_ids) ? rule.role_ids.join(",") : "");
+        const roleIds = Array.isArray(rule.role_ids) ? rule.role_ids.map(String) : [];
+        const roleValue = escapeAttr(roleIds.join(","));
+        const vehicleScope = escapeAttr(rule.vehicle_id || "");
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td><input data-field="status" value="${status}" placeholder="Alerte" /></td>
-          <td><input data-field="channel_id" value="${channelId}" placeholder="1234567890" /></td>
-          <td><input data-field="role_ids" value="${roleValue}" placeholder="111,222,333" /></td>
+          <td>
+            <select data-field="vehicle_scope"></select>
+          </td>
+          <td><input data-field="status" value="${status}" placeholder="Indisponible Materiel" /></td>
+          <td>
+            <div class="rule-select-wrap">
+              <select data-field="channel_select"></select>
+              <input data-field="channel_id" value="${channelId}" placeholder="Channel ID manuel" />
+            </div>
+          </td>
+          <td>
+            <div class="rule-select-wrap">
+              <select data-field="role_select" multiple></select>
+              <input data-field="role_ids" value="${roleValue}" placeholder="Role IDs manuels: 111,222" />
+            </div>
+          </td>
           <td><input data-field="enabled" type="checkbox" ${rule.enabled === false ? "" : "checked"} /></td>
           <td><button class="tiny-btn danger-btn">Supprimer</button></td>
         `;
+
+        const vehicleScopeSelect = tr.querySelector('[data-field="vehicle_scope"]');
+        const channelSelect = tr.querySelector('[data-field="channel_select"]');
+        const roleSelect = tr.querySelector('[data-field="role_select"]');
+        const channelInput = tr.querySelector('[data-field="channel_id"]');
+        const roleInput = tr.querySelector('[data-field="role_ids"]');
+
+        populateVehicleScopeSelect(vehicleScopeSelect, vehicleScope);
+        populateChannelSelect(channelSelect, channelId);
+        populateRoleSelect(roleSelect, roleIds);
+
+        channelSelect.addEventListener("change", () => {
+          if (channelSelect.value) {
+            channelInput.value = channelSelect.value;
+            syncRulesJsonFromTable();
+          }
+        });
+
+        channelInput.addEventListener("change", () => {
+          populateChannelSelect(channelSelect, channelInput.value.trim());
+        });
+
+        roleSelect.addEventListener("change", () => {
+          const selected = Array.from(roleSelect.selectedOptions).map((option) => option.value);
+          roleInput.value = selected.join(",");
+          syncRulesJsonFromTable();
+        });
+
+        roleInput.addEventListener("change", () => {
+          const parsedRoleIds = roleInput.value
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean);
+          populateRoleSelect(roleSelect, parsedRoleIds);
+        });
 
         tr.querySelector("button").addEventListener("click", () => {
           tr.remove();
           syncRulesJsonFromTable();
         });
 
-        tr.querySelectorAll("input").forEach((input) => {
+        tr.querySelectorAll("input, select").forEach((input) => {
           input.addEventListener("input", syncRulesJsonFromTable);
           input.addEventListener("change", syncRulesJsonFromTable);
         });
@@ -799,16 +1123,19 @@
       }
 
       function readRulesFromTable() {
-        return Array.from(ui.rulesRows.querySelectorAll("tr")).map((row) => ({
-          status: row.querySelector('[data-field="status"]').value.trim(),
-          channel_id: row.querySelector('[data-field="channel_id"]').value.trim(),
-          role_ids: row
-            .querySelector('[data-field="role_ids"]')
-            .value.split(",")
-            .map((v) => v.trim())
-            .filter(Boolean),
-          enabled: row.querySelector('[data-field="enabled"]').checked
-        }));
+        return Array.from(ui.rulesRows.querySelectorAll("tr"))
+          .map((row) => ({
+            vehicle_id: row.querySelector('[data-field="vehicle_scope"]').value.trim() || null,
+            status: row.querySelector('[data-field="status"]').value.trim(),
+            channel_id: row.querySelector('[data-field="channel_id"]').value.trim(),
+            role_ids: row
+              .querySelector('[data-field="role_ids"]')
+              .value.split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+            enabled: row.querySelector('[data-field="enabled"]').checked
+          }))
+          .filter((entry) => entry.status.length > 0 || entry.channel_id.length > 0);
       }
 
       function syncVehiclesJsonFromTable() {
@@ -826,6 +1153,7 @@
           ui.vehiclesRows.appendChild(createVehicleRow({}));
         }
         syncVehiclesJsonFromTable();
+        refreshRuleVehicleScopeOptions();
       }
 
       function renderRulesTable(rules) {
@@ -843,6 +1171,18 @@
           throw new Error(`${type}: le JSON doit etre un tableau`);
         }
         return parsed;
+      }
+
+      async function loadDiscordResources(guildId) {
+        try {
+          const data = await api(`/guilds/${guildId}/discord-resources`);
+          state.discordResources = {
+            channels: Array.isArray(data?.channels) ? data.channels : [],
+            roles: Array.isArray(data?.roles) ? data.roles : []
+          };
+        } catch {
+          state.discordResources = { channels: [], roles: [] };
+        }
       }
 
       async function loadSelectedGuildConfig() {
@@ -865,6 +1205,7 @@
             api(`/guilds/${guild.id}/vehicles`),
             api(`/guilds/${guild.id}/status-rules`)
           ]);
+          await loadDiscordResources(guild.id);
           renderVehiclesTable(vehicles || []);
           renderRulesTable(rules || []);
           setStatus("Configuration chargee.", "ok");
@@ -895,7 +1236,18 @@
       async function saveRules() {
         if (!state.selectedGuildId) return;
         try {
-          const rows = rowsFromJson(ui.rulesJson.value, "Regles");
+          const rows = rowsFromJson(ui.rulesJson.value, "Regles").map((row) => ({
+            vehicle_id: (row.vehicle_id ?? row.vehicle_scope ?? "").toString().trim() || null,
+            status: String(row.status ?? "").trim(),
+            channel_id: String(row.channel_id ?? "").trim(),
+            role_ids: Array.isArray(row.role_ids)
+              ? row.role_ids.map((entry) => String(entry).trim()).filter(Boolean)
+              : String(row.role_ids ?? "")
+                  .split(",")
+                  .map((entry) => entry.trim())
+                  .filter(Boolean),
+            enabled: row.enabled !== false
+          }));
           await api(`/guilds/${state.selectedGuildId}/status-rules`, {
             method: "PUT",
             body: JSON.stringify(rows)
@@ -935,6 +1287,8 @@
       ui.landingDemoBtn.addEventListener("click", () => {
         document.getElementById("featureSection").scrollIntoView({ behavior: "smooth", block: "start" });
       });
+      ui.themeToggleBtnLanding.addEventListener("click", toggleTheme);
+      ui.themeToggleBtnDashboard.addEventListener("click", toggleTheme);
       ui.logoutBtn.addEventListener("click", () => {
         const form = document.createElement("form");
         form.method = "POST";
@@ -946,6 +1300,7 @@
       ui.addVehicleRow.addEventListener("click", () => {
         ui.vehiclesRows.appendChild(createVehicleRow({}));
         syncVehiclesJsonFromTable();
+        refreshRuleVehicleScopeOptions();
       });
       ui.addRuleRow.addEventListener("click", () => {
         ui.rulesRows.appendChild(createRuleRow({}));
@@ -972,6 +1327,7 @@
         }
       });
 
+      setTheme(localStorage.getItem("dashboard_theme") || "light");
       bootstrap();
     </script>
   </body>
