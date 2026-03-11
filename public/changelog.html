@@ -100,6 +100,16 @@
         <p class="muted">Historique des evolutions du projet Webhook Discord.</p>
 
         <article class="release">
+          <h2>v1.5.1 - Stabilite Discord rate limit</h2>
+          <div class="date">11 mars 2026</div>
+          <ul>
+            <li>Retry automatique avec backoff sur les appels Discord OAuth en cas de 429.</li>
+            <li>Cache court des guilds admin en session pour reduire les appels repetes.</li>
+            <li>Retour API explicite en 429 au lieu d'une erreur interne generique.</li>
+          </ul>
+        </article>
+
+        <article class="release">
           <h2>v1.5.0 - Multi-pages + diagnostics logs</h2>
           <div class="date">11 mars 2026</div>
           <ul>

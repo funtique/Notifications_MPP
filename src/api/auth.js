@@ -1,3 +1,7 @@
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function buildUrl(base, params) {
   const url = new URL(base);
   for (const [key, value] of Object.entries(params)) {
@@ -9,18 +13,40 @@ function buildUrl(base, params) {
 }
 
 async function discordRequest(path, { accessToken }) {
-  const response = await fetch(`https://discord.com/api/v10${path}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`
+  const maxAttempts = 4;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(`https://discord.com/api/v10${path}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (response.ok) {
+      return response.json();
     }
-  });
 
-  if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Discord request failed (${response.status}): ${body}`);
-  }
+    if (response.status === 429 && attempt < maxAttempts) {
+      let retryMs = Number(response.headers.get("retry-after")) * 1000;
+      if (!Number.isFinite(retryMs)) {
+        try {
+          const parsed = JSON.parse(body);
+          retryMs = Number(parsed?.retry_after) * 1000;
+        } catch {
+          retryMs = 1000;
+        }
+      }
+      const boundedRetryMs = Math.max(250, Math.min(5000, Number.isFinite(retryMs) ? retryMs : 1000));
+      await wait(boundedRetryMs);
+      continue;
+    }
 
-  return response.json();
+    const error = new Error(`Discord request failed (${response.status}): ${body}`);
+    error.status = response.status;
+    error.body = body;
+    throw error;
+  }
 }
 
 function hasAdminPermission(permissionString) {
@@ -114,8 +140,19 @@ export function createAuthHandlers(config) {
   }
 
   async function fetchAdminGuilds(req) {
+    const ttlMs = 30_000;
+    const cachedAt = Number(req.session.guildsCacheAt ?? 0);
+    const cachedGuilds = Array.isArray(req.session.adminGuildsCache) ? req.session.adminGuildsCache : null;
+
+    if (cachedGuilds && Date.now() - cachedAt < ttlMs) {
+      return cachedGuilds;
+    }
+
     const guilds = await discordRequest("/users/@me/guilds", { accessToken: req.session.accessToken });
-    return guilds.filter((guild) => hasAdminPermission(guild.permissions));
+    const adminGuilds = guilds.filter((guild) => hasAdminPermission(guild.permissions));
+    req.session.adminGuildsCache = adminGuilds;
+    req.session.guildsCacheAt = Date.now();
+    return adminGuilds;
   }
 
   return {

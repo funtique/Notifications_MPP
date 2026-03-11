@@ -13,6 +13,9 @@ function asyncHandler(fn) {
 function isDiscordUnauthorizedError(error) {
   return /Discord request failed \(401\)/i.test(String(error?.message ?? ""));
 }
+function isDiscordRateLimitedError(error) {
+  return error?.status === 429 || /Discord request failed \(429\)/i.test(String(error?.message ?? ""));
+}
 
 function toBoolean(value, fallback = true) {
   if (typeof value === "boolean") return value;
@@ -332,6 +335,9 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
       if (isDiscordUnauthorizedError(error)) {
         return res.status(401).json({ error: "Authentication required" });
       }
+      if (isDiscordRateLimitedError(error)) {
+        return res.status(429).json({ error: "Discord rate limited this session. Retry in a few seconds." });
+      }
       throw error;
     }
   });
@@ -355,6 +361,9 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
       } catch (error) {
         if (isDiscordUnauthorizedError(error)) {
           return res.status(401).json({ error: "Authentication required" });
+        }
+        if (isDiscordRateLimitedError(error)) {
+          return res.status(429).json({ error: "Discord rate limited this session. Retry in a few seconds." });
         }
         throw error;
       }
