@@ -1,4 +1,5 @@
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import session from "express-session";
@@ -14,6 +15,7 @@ import { createApiRouter } from "./routes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.resolve(__dirname, "../../public");
+process.env.LOG_FILE_BASENAME = process.env.LOG_FILE_BASENAME || "api";
 
 const config = getApiConfig();
 const db = createDatabase(config.databaseUrl);
@@ -32,6 +34,12 @@ const app = express();
 app.set("trust proxy", 1);
 
 app.use(morgan("combined"));
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  next();
+});
 app.use(express.json({ limit: "1mb" }));
 app.use(
   session({
@@ -51,6 +59,7 @@ app.use("/api", createApiRouter({ repos, authHandlers, config, logger }));
 app.use(express.static(publicDir));
 app.use((error, req, res, _next) => {
   logger.error("Unhandled API error", {
+    requestId: req.requestId,
     path: req.originalUrl,
     method: req.method,
     error: String(error?.stack ?? error)
@@ -61,7 +70,7 @@ app.use((error, req, res, _next) => {
   }
 
   if (req.originalUrl?.startsWith("/api/")) {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error", request_id: req.requestId });
     return;
   }
 

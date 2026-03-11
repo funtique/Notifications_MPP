@@ -95,7 +95,7 @@ export function createAuthHandlers(config) {
       if (error) {
         return res.status(500).send("Unable to persist login session");
       }
-      return res.redirect("/");
+      return res.redirect("/dashboard.html");
     });
   }
 

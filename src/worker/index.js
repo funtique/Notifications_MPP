@@ -5,6 +5,8 @@ import { createRepositories } from "../db/repositories.js";
 import { logger } from "../lib/logger.js";
 import { runPollingCycle } from "./processor.js";
 
+process.env.LOG_FILE_BASENAME = process.env.LOG_FILE_BASENAME || "worker";
+
 const config = getWorkerConfig();
 const db = createDatabase(config.databaseUrl);
 migrate(db);

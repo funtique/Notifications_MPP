@@ -100,6 +100,19 @@
         <p class="muted">Historique des evolutions du projet Webhook Discord.</p>
 
         <article class="release">
+          <h2>v1.5.0 - Multi-pages + diagnostics logs</h2>
+          <div class="date">11 mars 2026</div>
+          <ul>
+            <li>Separation landing/dashboard: nouvelle page <code>/dashboard.html</code> pour l'admin.</li>
+            <li>Callback OAuth redirige desormais vers le dashboard.</li>
+            <li>Collecte de logs persistants (API + worker) en fichiers ndjson dans <code>logs/</code>.</li>
+            <li>Endpoint diagnostics pour lire les derniers logs API depuis l'interface.</li>
+            <li>Ajout du request_id sur les erreurs API pour tracer rapidement les incidents.</li>
+            <li>Verification de presence bot durcie avec fallback de sonde guild.</li>
+          </ul>
+        </article>
+
+        <article class="release">
           <h2>v1.4.1 - Stabilite dashboard + dark mode polish</h2>
           <div class="date">11 mars 2026</div>
           <ul>

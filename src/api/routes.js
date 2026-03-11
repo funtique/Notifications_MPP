@@ -2,6 +2,7 @@ import express from "express";
 import { requireAuth } from "./middleware.js";
 import { buildDiscordPayload, sendDiscordMessageWithRetry } from "../lib/discord.js";
 import { parseFeed } from "../lib/rss.js";
+import { readRecentLogEntries } from "../lib/logger.js";
 
 function asyncHandler(fn) {
   return function wrapped(req, res, next) {
@@ -199,6 +200,17 @@ async function discordBotRequest(path, { botToken }) {
   return response.json();
 }
 
+async function discordBotRequestRaw(path, { botToken }) {
+  const response = await fetch(`https://discord.com/api/v10${path}`, {
+    headers: {
+      Authorization: `Bot ${botToken}`
+    }
+  });
+
+  const body = await response.text();
+  return { ok: response.ok, status: response.status, body };
+}
+
 function normalizeStatusRuleScope(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -284,6 +296,20 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
     res.json({ ok: true, timestamp: new Date().toISOString() });
   });
 
+  router.get(
+    "/diagnostics/logs",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const limit = Number(req.query?.limit ?? 200);
+      const logs = readRecentLogEntries({ basename: "api", limit });
+      return res.json({
+        ok: true,
+        count: logs.length,
+        logs
+      });
+    })
+  );
+
   router.get("/auth/login", authHandlers.login);
   router.get("/auth/callback", authHandlers.callback);
   router.post("/auth/logout", authHandlers.logout);
@@ -336,8 +362,17 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
   );
 
   router.get("/guilds/:guildId/vehicles", requireAuth, requireGuildAdmin, (req, res) => {
-    const data = repos.listVehicleFeeds(req.params.guildId);
-    res.json(data);
+    try {
+      const data = repos.listVehicleFeeds(req.params.guildId);
+      res.json(data);
+    } catch (error) {
+      logger.error("Vehicles read failed", {
+        requestId: req.requestId,
+        guildId: req.params.guildId,
+        error: String(error?.stack ?? error)
+      });
+      res.status(500).json({ error: "Unable to load vehicle configuration", request_id: req.requestId });
+    }
   });
 
   router.post(
@@ -402,8 +437,17 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
   );
 
   router.get("/guilds/:guildId/status-rules", requireAuth, requireGuildAdmin, (req, res) => {
-    const data = repos.listStatusRules(req.params.guildId);
-    res.json(data);
+    try {
+      const data = repos.listStatusRules(req.params.guildId);
+      res.json(data);
+    } catch (error) {
+      logger.error("Status rules read failed", {
+        requestId: req.requestId,
+        guildId: req.params.guildId,
+        error: String(error?.stack ?? error)
+      });
+      res.status(500).json({ error: "Unable to load status rules", request_id: req.requestId });
+    }
   });
 
   router.put("/guilds/:guildId/status-rules", requireAuth, requireGuildAdmin, (req, res) => {
@@ -539,6 +583,18 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
         const botIdentity = await getBotIdentity();
         const isPresent = await checkBotPresenceWithRetry({ guildId, botUserId: botIdentity.id });
         if (!isPresent) {
+          // Fallback probe: GET /guilds/{guildId} can succeed even when member lookup is delayed.
+          const guildProbe = await discordBotRequestRaw(`/guilds/${guildId}`, { botToken: config.discordBotToken });
+          if (guildProbe.ok) {
+            return res.json({
+              present: true,
+              bot_user_id: botIdentity.id,
+              bot_username: botIdentity.username,
+              invite_url: inviteUrl,
+              note: "Bot presence confirmed via guild probe."
+            });
+          }
+
           return res.json({
             present: false,
             invite_url: inviteUrl
