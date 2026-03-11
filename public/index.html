@@ -656,6 +656,13 @@
         const banner = ui.botStatusBanner;
         if (!banner) return;
 
+        if (status?.code === "BOT_TOKEN_INVALID") {
+          banner.className = "bot-banner warn";
+          banner.textContent =
+            "Token bot invalide/expire. Regenerer DISCORD_BOT_TOKEN puis redemarrer l'API et le worker.";
+          return;
+        }
+
         if (status?.present) {
           banner.className = "bot-banner ok";
           const botName = status.bot_username || "Le bot";
@@ -665,7 +672,8 @@
 
         if (status?.invite_url) {
           banner.className = "bot-banner warn";
-          banner.innerHTML = `Le bot n'est pas encore sur ce serveur. <a class="inline-link" href="${escapeAttr(status.invite_url)}" target="_blank" rel="noopener noreferrer">Inviter le bot</a>`;
+          const warning = status.warning ? `${escapeAttr(status.warning)} ` : "Le bot n'est pas encore sur ce serveur. ";
+          banner.innerHTML = `${warning}<a class="inline-link" href="${escapeAttr(status.invite_url)}" target="_blank" rel="noopener noreferrer">Inviter le bot</a>`;
           return;
         }
 

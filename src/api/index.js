@@ -68,7 +68,7 @@ app.use((error, req, res, _next) => {
   res.status(500).send("Internal server error");
 });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   logger.info("API server started", {
     port: config.port,
     appBaseUrl: config.appBaseUrl,
@@ -76,10 +76,26 @@ app.listen(config.port, () => {
   });
 });
 
+server.on("error", (error) => {
+  if (error?.code === "EADDRINUSE") {
+    logger.error("API startup failed: port already in use", {
+      port: config.port,
+      hint: "Stop the existing process/container on this port before restarting."
+    });
+    process.exit(1);
+    return;
+  }
+
+  logger.error("API startup failed", { error: String(error?.stack ?? error) });
+  process.exit(1);
+});
+
 function shutdown(signal) {
   logger.info("API shutdown requested", { signal });
-  db.close();
-  process.exit(0);
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));

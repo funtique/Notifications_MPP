@@ -183,6 +183,8 @@ async function discordBotRequest(path, { botToken }) {
     const body = await response.text();
     const error = new Error(`Discord bot request failed (${response.status}): ${body}`);
     error.status = response.status;
+    error.path = path;
+    error.body = body;
     throw error;
   }
 
@@ -203,13 +205,48 @@ function buildBotInviteUrl(config, guildId) {
 
 export function createApiRouter({ repos, authHandlers, config, logger }) {
   const router = express.Router();
-  let botIdentityPromise = null;
+  let botIdentityCache = null;
+  let botIdentityFetchedAtMs = 0;
+  let botIdentityInFlightPromise = null;
+  const BOT_IDENTITY_CACHE_TTL_MS = 5 * 60 * 1000;
 
-  function getBotIdentity() {
-    if (!botIdentityPromise) {
-      botIdentityPromise = discordBotRequest("/users/@me", { botToken: config.discordBotToken });
+  function parseDiscordErrorBody(error) {
+    const raw = String(error?.body ?? "").trim();
+    if (!raw) {
+      return { raw: "" };
     }
-    return botIdentityPromise;
+
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        raw,
+        code: parsed?.code ?? null,
+        message: parsed?.message ?? null
+      };
+    } catch {
+      return { raw };
+    }
+  }
+
+  async function getBotIdentity() {
+    const now = Date.now();
+    if (botIdentityCache && now - botIdentityFetchedAtMs < BOT_IDENTITY_CACHE_TTL_MS) {
+      return botIdentityCache;
+    }
+
+    if (!botIdentityInFlightPromise) {
+      botIdentityInFlightPromise = discordBotRequest("/users/@me", { botToken: config.discordBotToken })
+        .then((identity) => {
+          botIdentityCache = identity;
+          botIdentityFetchedAtMs = Date.now();
+          return identity;
+        })
+        .finally(() => {
+          botIdentityInFlightPromise = null;
+        });
+    }
+
+    return botIdentityInFlightPromise;
   }
 
   router.get("/health", (_req, res) => {
@@ -413,6 +450,8 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
           invite_url: inviteUrl
         });
       } catch (error) {
+        const details = parseDiscordErrorBody(error);
+
         if (error?.status === 404) {
           return res.json({
             present: false,
@@ -420,7 +459,44 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
           });
         }
 
-        logger.error("Bot status lookup failed", { guildId, error: String(error) });
+        if (error?.status === 401) {
+          logger.error("Bot status lookup unauthorized", {
+            guildId,
+            path: error?.path,
+            discordCode: details.code,
+            discordMessage: details.message,
+            discordRaw: details.raw
+          });
+          return res.status(500).json({
+            error: "DISCORD_BOT_TOKEN invalide ou expire. Regenerer le token bot puis redemarrer l'API/worker.",
+            code: "BOT_TOKEN_INVALID"
+          });
+        }
+
+        if (error?.status === 403) {
+          logger.warn("Bot status lookup forbidden", {
+            guildId,
+            path: error?.path,
+            discordCode: details.code,
+            discordMessage: details.message,
+            discordRaw: details.raw
+          });
+          return res.json({
+            present: false,
+            invite_url: inviteUrl,
+            warning: "Le bot n'a pas encore acces a ce serveur (ou droits insuffisants)."
+          });
+        }
+
+        logger.error("Bot status lookup failed", {
+          guildId,
+          path: error?.path,
+          status: error?.status ?? null,
+          discordCode: details.code,
+          discordMessage: details.message,
+          discordRaw: details.raw,
+          error: String(error)
+        });
         return res.status(502).json({ error: "Unable to verify bot presence on this guild right now." });
       }
     })
