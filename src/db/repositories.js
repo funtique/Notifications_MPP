@@ -13,6 +13,9 @@ function parseRoleIds(value) {
 }
 
 export function createRepositories(db) {
+  const statusRulesCols = db.prepare("PRAGMA table_info(status_rules)").all();
+  const hasStatusRuleVehicleScope = statusRulesCols.some((col) => col.name === "vehicle_id");
+
   const upsertGuildStmt = db.prepare(`
     INSERT INTO guild_configs (guild_id, guild_name, created_at, updated_at)
     VALUES (@guild_id, @guild_name, @created_at, @updated_at)
@@ -27,10 +30,15 @@ export function createRepositories(db) {
   `);
 
   const deleteStatusRulesStmt = db.prepare("DELETE FROM status_rules WHERE guild_id = ?");
-  const insertStatusRuleStmt = db.prepare(`
-    INSERT INTO status_rules (guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at)
-    VALUES (@guild_id, @vehicle_id, @status, @channel_id, @role_ids_json, @enabled, @created_at, @updated_at)
-  `);
+  const insertStatusRuleStmt = hasStatusRuleVehicleScope
+    ? db.prepare(`
+        INSERT INTO status_rules (guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at)
+        VALUES (@guild_id, @vehicle_id, @status, @channel_id, @role_ids_json, @enabled, @created_at, @updated_at)
+      `)
+    : db.prepare(`
+        INSERT INTO status_rules (guild_id, status, channel_id, role_ids_json, enabled, created_at, updated_at)
+        VALUES (@guild_id, @status, @channel_id, @role_ids_json, @enabled, @created_at, @updated_at)
+      `);
 
   const listGuildVehicleFeedsStmt = db.prepare(`
     SELECT id, guild_id, vehicle_id, vehicle_name, rss_url, enabled, created_at, updated_at
@@ -47,26 +55,42 @@ export function createRepositories(db) {
     ORDER BY vf.guild_id ASC, vf.vehicle_id ASC
   `);
 
-  const listStatusRulesStmt = db.prepare(`
-    SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at
-    FROM status_rules
-    WHERE guild_id = ?
-    ORDER BY status ASC, vehicle_id ASC
-  `);
+  const listStatusRulesStmt = hasStatusRuleVehicleScope
+    ? db.prepare(`
+        SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at
+        FROM status_rules
+        WHERE guild_id = ?
+        ORDER BY status ASC, vehicle_id ASC
+      `)
+    : db.prepare(`
+        SELECT id, guild_id, NULL AS vehicle_id, status, channel_id, role_ids_json, enabled, created_at, updated_at
+        FROM status_rules
+        WHERE guild_id = ?
+        ORDER BY status ASC
+      `);
 
-  const getStatusRuleByVehicleStmt = db.prepare(`
-    SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled
-    FROM status_rules
-    WHERE guild_id = ? AND vehicle_id = ? AND status = ? AND enabled = 1
-    LIMIT 1
-  `);
+  const getStatusRuleByVehicleStmt = hasStatusRuleVehicleScope
+    ? db.prepare(`
+        SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled
+        FROM status_rules
+        WHERE guild_id = ? AND vehicle_id = ? AND status = ? AND enabled = 1
+        LIMIT 1
+      `)
+    : null;
 
-  const getGlobalStatusRuleStmt = db.prepare(`
-    SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled
-    FROM status_rules
-    WHERE guild_id = ? AND status = ? AND enabled = 1 AND (vehicle_id IS NULL OR vehicle_id = '')
-    LIMIT 1
-  `);
+  const getGlobalStatusRuleStmt = hasStatusRuleVehicleScope
+    ? db.prepare(`
+        SELECT id, guild_id, vehicle_id, status, channel_id, role_ids_json, enabled
+        FROM status_rules
+        WHERE guild_id = ? AND status = ? AND enabled = 1 AND (vehicle_id IS NULL OR vehicle_id = '')
+        LIMIT 1
+      `)
+    : db.prepare(`
+        SELECT id, guild_id, NULL AS vehicle_id, status, channel_id, role_ids_json, enabled
+        FROM status_rules
+        WHERE guild_id = ? AND status = ? AND enabled = 1
+        LIMIT 1
+      `);
 
   const hasEventStmt = db.prepare(`
     SELECT 1 AS found
@@ -130,16 +154,28 @@ export function createRepositories(db) {
     const now = nowIso();
     deleteStatusRulesStmt.run(guildId);
     for (const rule of rules) {
-      insertStatusRuleStmt.run({
-        guild_id: guildId,
-        vehicle_id: rule.vehicle_id ? String(rule.vehicle_id) : null,
-        status: String(rule.status),
-        channel_id: String(rule.channel_id),
-        role_ids_json: JSON.stringify(Array.isArray(rule.role_ids) ? rule.role_ids.map(String) : []),
-        enabled: rule.enabled ? 1 : 0,
-        created_at: now,
-        updated_at: now
-      });
+      if (hasStatusRuleVehicleScope) {
+        insertStatusRuleStmt.run({
+          guild_id: guildId,
+          vehicle_id: rule.vehicle_id ? String(rule.vehicle_id) : null,
+          status: String(rule.status),
+          channel_id: String(rule.channel_id),
+          role_ids_json: JSON.stringify(Array.isArray(rule.role_ids) ? rule.role_ids.map(String) : []),
+          enabled: rule.enabled ? 1 : 0,
+          created_at: now,
+          updated_at: now
+        });
+      } else {
+        insertStatusRuleStmt.run({
+          guild_id: guildId,
+          status: String(rule.status),
+          channel_id: String(rule.channel_id),
+          role_ids_json: JSON.stringify(Array.isArray(rule.role_ids) ? rule.role_ids.map(String) : []),
+          enabled: rule.enabled ? 1 : 0,
+          created_at: now,
+          updated_at: now
+        });
+      }
     }
   });
 
@@ -204,8 +240,9 @@ export function createRepositories(db) {
       const scopedVehicleId = vehicleId ? String(vehicleId) : null;
 
       const row =
-        (scopedVehicleId ? getStatusRuleByVehicleStmt.get(targetGuildId, scopedVehicleId, targetStatus) : null) ??
-        getGlobalStatusRuleStmt.get(targetGuildId, targetStatus);
+        (scopedVehicleId && getStatusRuleByVehicleStmt
+          ? getStatusRuleByVehicleStmt.get(targetGuildId, scopedVehicleId, targetStatus)
+          : null) ?? getGlobalStatusRuleStmt.get(targetGuildId, targetStatus);
 
       if (!row) return null;
       return {

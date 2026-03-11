@@ -132,6 +132,10 @@
         font-size: 12px;
         font-weight: 700;
       }
+      body[data-theme="dark"] .badge {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fecaca;
+      }
 
       h1 {
         margin: 12px 0 12px;
@@ -165,6 +169,11 @@
         color: var(--primary-dark);
         border: 1px solid #fca5a5;
       }
+      body[data-theme="dark"] .ghost-btn {
+        background: #0f172a;
+        color: #f8fafc;
+        border-color: #475569;
+      }
 
       .hero-card {
         padding: 22px;
@@ -186,6 +195,10 @@
         border-radius: 12px;
         border: 1px solid #fda4af;
         background: #fff;
+      }
+      body[data-theme="dark"] .mini-item {
+        border-color: #374151;
+        background: #111827;
       }
 
       .features {
@@ -264,9 +277,18 @@
         border: 1px solid #fecaca;
         border-radius: 12px;
       }
+      body[data-theme="dark"] .guild-btn {
+        background: #111827;
+        border-color: #334155;
+        color: #f8fafc;
+      }
 
       .guild-btn.active {
         background: #fee2e2;
+        border-color: #ef4444;
+      }
+      body[data-theme="dark"] .guild-btn.active {
+        background: rgba(239, 68, 68, 0.16);
         border-color: #ef4444;
       }
 
@@ -326,6 +348,9 @@
         color: #7f1d1d;
         font-size: 13px;
       }
+      body[data-theme="dark"] th {
+        color: #fecaca;
+      }
 
       td input[type="checkbox"] {
         width: 20px;
@@ -341,6 +366,10 @@
       .danger-btn {
         background: #fee2e2;
         color: #991b1b;
+      }
+      body[data-theme="dark"] .danger-btn {
+        background: rgba(239, 68, 68, 0.16);
+        color: #fecaca;
       }
 
       .status {
@@ -396,13 +425,28 @@
         border-radius: 12px;
         background: #fff6f6;
       }
+      body[data-theme="dark"] .empty {
+        border-color: #475569;
+        background: #0f172a;
+      }
       .field-hint {
         margin-top: 6px;
         color: var(--muted);
         font-size: 12px;
       }
       .theme-toggle {
-        min-width: 140px;
+        min-width: 44px;
+        width: 44px;
+        height: 40px;
+        padding: 0;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .theme-toggle svg {
+        width: 20px;
+        height: 20px;
       }
       .resolving {
         opacity: 0.75;
@@ -464,7 +508,7 @@
             <div class="cta-row">
               <button id="landingLoginBtn" class="primary-btn">Se connecter avec Discord</button>
               <button id="landingDemoBtn" class="ghost-btn">Voir les fonctionnalites</button>
-              <button id="themeToggleBtnLanding" class="ghost-btn theme-toggle">Dark mode</button>
+              <button id="themeToggleBtnLanding" class="ghost-btn theme-toggle" title="Basculer le theme" aria-label="Basculer le theme"></button>
               <a class="btn-link ghost-btn" href="/changelog.html">Voir le changelog</a>
             </div>
             <div class="hero-kpis">
@@ -534,7 +578,7 @@
             <div class="muted" id="welcomeText">Connecte</div>
           </div>
           <div class="cta-row" style="margin-top: 0">
-            <button id="themeToggleBtnDashboard" class="ghost-btn theme-toggle">Dark mode</button>
+            <button id="themeToggleBtnDashboard" class="ghost-btn theme-toggle" title="Basculer le theme" aria-label="Basculer le theme"></button>
             <a class="btn-link ghost-btn" href="/changelog.html">Changelog</a>
             <button id="logoutBtn" class="ghost-btn">Se deconnecter</button>
           </div>
@@ -705,9 +749,12 @@
         const nextTheme = theme === "dark" ? "dark" : "light";
         document.body.setAttribute("data-theme", nextTheme);
         localStorage.setItem("dashboard_theme", nextTheme);
-        const label = nextTheme === "dark" ? "Mode clair" : "Dark mode";
-        if (ui.themeToggleBtnLanding) ui.themeToggleBtnLanding.textContent = label;
-        if (ui.themeToggleBtnDashboard) ui.themeToggleBtnDashboard.textContent = label;
+        const icon =
+          nextTheme === "dark"
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"></path></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.2 14.2A8.5 8.5 0 1 1 9.8 3.8a7 7 0 0 0 10.4 10.4z"></path></svg>';
+        if (ui.themeToggleBtnLanding) ui.themeToggleBtnLanding.innerHTML = icon;
+        if (ui.themeToggleBtnDashboard) ui.themeToggleBtnDashboard.innerHTML = icon;
       }
 
       function toggleTheme() {
