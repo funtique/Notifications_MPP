@@ -43,6 +43,20 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseDiscordRetryAfterMs(rawBody, fallbackMs = 1000) {
+  if (!rawBody) return fallbackMs;
+  try {
+    const parsed = JSON.parse(String(rawBody));
+    const retrySeconds = Number(parsed?.retry_after);
+    if (Number.isFinite(retrySeconds) && retrySeconds > 0) {
+      return Math.min(10_000, Math.max(250, Math.round(retrySeconds * 1000)));
+    }
+  } catch {
+    // Ignore parse errors and keep fallback delay.
+  }
+  return fallbackMs;
+}
+
 function isLikelyUrl(value) {
   return typeof value === "string" && /^https?:\/\//i.test(value.trim());
 }
@@ -278,21 +292,83 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
     return botIdentityInFlightPromise;
   }
 
-  async function checkBotPresenceWithRetry({ guildId, botUserId, maxAttempts = 3, delayMs = 1200 }) {
+  async function checkBotPresenceWithRetry({ guildId, botUserId, maxAttempts = 5, delayMs = 1000 }) {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         await discordBotRequest(`/guilds/${guildId}/members/${botUserId}`, { botToken: config.discordBotToken });
         return true;
       } catch (error) {
-        if (error?.status !== 404) {
+        const isLastAttempt = attempt >= maxAttempts;
+        if (error?.status === 404) {
+          if (!isLastAttempt) {
+            await wait(delayMs * attempt);
+          }
+          continue;
+        }
+
+        if (error?.status === 429) {
+          if (!isLastAttempt) {
+            const retryAfterMs = parseDiscordRetryAfterMs(error?.body, delayMs * attempt);
+            await wait(retryAfterMs);
+            continue;
+          }
           throw error;
         }
-        if (attempt < maxAttempts) {
-          await wait(delayMs);
+
+        if (error?.status >= 500 && error?.status < 600) {
+          if (!isLastAttempt) {
+            await wait(delayMs * attempt);
+            continue;
+          }
+          throw error;
         }
+
+        if (error?.status === 403) {
+          return false;
+        }
+
+        if (error?.status === 401) {
+          throw error;
+        }
+
+        if (!isLastAttempt) {
+          await wait(delayMs);
+          continue;
+        }
+        throw error;
       }
     }
     return false;
+  }
+
+  async function probeGuildAccessWithRetry({ guildId, maxAttempts = 3, delayMs = 1000 }) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const result = await discordBotRequestRaw(`/guilds/${guildId}`, { botToken: config.discordBotToken });
+      if (result.ok) {
+        return { present: true, note: "Bot presence confirmed via guild probe." };
+      }
+
+      if (result.status === 403 || result.status === 404) {
+        return { present: false };
+      }
+
+      if (result.status === 429) {
+        const retryAfterMs = parseDiscordRetryAfterMs(result.body, delayMs * attempt);
+        if (attempt < maxAttempts) {
+          await wait(retryAfterMs);
+          continue;
+        }
+      }
+
+      if (result.status >= 500 && result.status < 600 && attempt < maxAttempts) {
+        await wait(delayMs * attempt);
+        continue;
+      }
+
+      return { present: false };
+    }
+
+    return { present: false };
   }
 
   router.get("/health", (_req, res) => {
@@ -593,14 +669,14 @@ export function createApiRouter({ repos, authHandlers, config, logger }) {
         const isPresent = await checkBotPresenceWithRetry({ guildId, botUserId: botIdentity.id });
         if (!isPresent) {
           // Fallback probe: GET /guilds/{guildId} can succeed even when member lookup is delayed.
-          const guildProbe = await discordBotRequestRaw(`/guilds/${guildId}`, { botToken: config.discordBotToken });
-          if (guildProbe.ok) {
+          const guildProbe = await probeGuildAccessWithRetry({ guildId });
+          if (guildProbe.present) {
             return res.json({
               present: true,
               bot_user_id: botIdentity.id,
               bot_username: botIdentity.username,
               invite_url: inviteUrl,
-              note: "Bot presence confirmed via guild probe."
+              note: guildProbe.note
             });
           }
 
